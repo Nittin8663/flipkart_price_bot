@@ -1,32 +1,30 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import time
+import requests
 
-# Chrome options
-options = Options()
-options.add_argument("--headless")  # Headless mode
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
+def fetch_price():
+    url = "https://api.croma.com/pricing-services/v1/price?productList=315011"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "channel": "WEB"  # This is the required header
+    }
 
-# Driver setup
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise exception for HTTP errors
 
-# Croma product URL (yahan apna product URL daalein)
-url = "https://www.croma.com/product/315011"  
+        data = response.json()
+        print("Response Data:", data)  # Inspect the full response
 
-driver.get(url)
-time.sleep(3)  # Page load ke liye wait
+        # Extract price if available
+        if "productList" in data and data["productList"]:
+            product = data["productList"][0]
+            price = product.get("price", "Price not available")
+            currency = product.get("currency", "INR")
+            print(f"Product ID 315011 Price: {currency} {price}")
+        else:
+            print("Price not found for Product ID 315011")
 
-try:
-    # Price selector
-    price_element = driver.find_element(By.CSS_SELECTOR, "span.amount[data-testid='new-price']")
-    price = price_element.text
-    print(f"Price: {price}")
-except Exception as e:
-    print("Price not found or error:", e)
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching price: {e}")
 
-driver.quit()
+if __name__ == "__main__":
+    fetch_price()
