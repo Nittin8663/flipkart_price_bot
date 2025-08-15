@@ -19,7 +19,7 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-# HTML Template
+# HTML Template for main page
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -63,6 +63,7 @@ button { padding: 5px 10px; }
 </html>
 """
 
+# HTML Template for editing target price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -84,6 +85,7 @@ button { padding: 5px 10px; }
 </html>
 """
 
+# Load and save products
 def load_products():
     try:
         with open("products.json") as f:
@@ -95,53 +97,58 @@ def save_products(products):
     with open("products.json", "w") as f:
         json.dump(products, f, indent=4)
 
+# Telegram message
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     requests.post(url, data=data)
 
+# Flipkart price
+def get_flipkart_price(driver, url):
+    driver.get(url)
+    try:
+        price_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
+        )
+        price_text = price_element.text.replace("₹", "").replace(",", "")
+        return int(price_text)
+    except:
+        return None
+
+# Croma price
+def get_croma_price(driver, url):
+    driver.get(url)
+    try:
+        price_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "pdp-product-price"))
+        )
+        price_text = price_element.get_attribute("value")
+        return int(price_text.replace(",", ""))
+    except:
+        return None
+
+# Decide which function to use
 def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
+
     try:
         if "flipkart.com" in url:
-            price_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
-            )
-            price_text = price_element.text.replace("₹","").replace(",","").strip()
-            price = int(price_text)
+            price = get_flipkart_price(driver, url)
         elif "croma.com" in url:
-            selectors = ["span#pdp-product-price", "span.amount"]
-            price_text = None
-            for sel in selectors:
-                try:
-                    price_element = WebDriverWait(driver, 15).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, sel))
-                    )
-                    price_text = price_element.get_attribute("textContent").strip()
-                    if price_text:
-                        break
-                except:
-                    continue
-            if not price_text:
-                driver.quit()
-                return None
-            price_text = price_text.replace("₹","").replace(",","").strip()
-            price = int(price_text)
+            price = get_croma_price(driver, url)
         else:
-            driver.quit()
-            return None
-        driver.quit()
-        return price
+            price = None
     except Exception as e:
-        print(f"Error fetching price: {e}")
-        driver.quit()
-        return None
+        print("Error fetching price:", e)
+        price = None
+    driver.quit()
+    return price
 
+# Price checker loop
 def price_checker():
     while True:
         products = load_products()
@@ -158,6 +165,7 @@ def price_checker():
                 print("Price not found.")
         time.sleep(CHECK_INTERVAL)
 
+# Flask routes
 @app.route("/")
 def index():
     products = load_products()
@@ -189,7 +197,7 @@ def toggle(index):
     save_products(products)
     return redirect("/")
 
-@app.route("/edit/<int:index>", methods=["GET","POST"])
+@app.route("/edit/<int:index>", methods=["GET", "POST"])
 def edit(index):
     products = load_products()
     if request.method == "POST":
