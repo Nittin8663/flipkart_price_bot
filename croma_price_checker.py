@@ -7,58 +7,41 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
-# Chrome setup
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--window-size=1920,1080")
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 def get_croma_price(url):
-    try:
-        driver.get(url)
-        wait = WebDriverWait(driver, 15)
+    driver.get(url)
+    wait = WebDriverWait(driver, 20)  # 20 sec max wait
 
-        # Cookies popup close
+    # Scroll slowly to make sure dynamic content loads
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+    time.sleep(2)
+
+    # Try multiple possible selectors
+    selectors = [
+        "span.amount[data-testid='new-price']",
+        "span.amount",
+        "span.price",
+        ".product-price .amount"
+    ]
+
+    for sel in selectors:
         try:
-            accept_btn = wait.until(
-                EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))
-            )
-            accept_btn.click()
+            price_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, sel)))
+            price = price_element.text.strip()
+            if price:
+                return price
         except:
-            pass
+            continue
 
-        # Scroll down to make sure price loads
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-        time.sleep(2)
+    return None
 
-        # Try multiple selectors for price
-        selectors = [
-            "span.amount[data-testid='new-price']",
-            "span.amount",  # backup
-            "span.price"    # backup
-        ]
-
-        price = None
-        for sel in selectors:
-            try:
-                price_element = driver.find_element(By.CSS_SELECTOR, sel)
-                price = price_element.text.strip()
-                if price:
-                    break
-            except:
-                continue
-
-        return price
-
-    except Exception as e:
-        print("Error fetching price:", e)
-        return None
-
-# Example
 url = "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011"
 price = get_croma_price(url)
 if price:
