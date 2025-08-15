@@ -72,6 +72,7 @@ body { font-family: Arial; margin: 40px; }
 input[type=number] { width: 100%; padding: 5px; }
 button { padding: 5px 10px; }
 </style>
+</head>
 <body>
 <h2>Edit Target Price for {{ product.name }}</h2>
 <form method="post" action="/edit/{{ index }}">
@@ -82,19 +83,25 @@ button { padding: 5px 10px; }
 </html>
 """
 
+# Product storage
 def load_products():
-    with open("products.json") as f:
-        return json.load(f)
+    try:
+        with open("products.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
 
 def save_products(products):
     with open("products.json", "w") as f:
         json.dump(products, f, indent=4)
 
+# Telegram alert
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     requests.post(url, data=data)
 
+# Price fetching from Croma
 def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -103,17 +110,26 @@ def get_price(url):
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
     time.sleep(5)
-    try:
-        # Croma price selector
-        price_element = driver.find_element(By.CSS_SELECTOR, "span.pdpPrice")
-        price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-        driver.quit()
-        return int(price_text)
-    except Exception as e:
-        print("Error fetching price:", e)
-        driver.quit()
-        return None
+    price_selectors = [
+        "div.product-price span",
+        "span#final_price",
+        "span.price",
+        "div.pdp-price span"
+    ]
+    price = None
+    for selector in price_selectors:
+        try:
+            price_element = driver.find_element(By.CSS_SELECTOR, selector)
+            price_text = price_element.text.replace("₹", "").replace(",", "").strip()
+            if price_text:
+                price = int(price_text)
+                break
+        except:
+            continue
+    driver.quit()
+    return price
 
+# Background price checker
 def price_checker():
     while True:
         products = load_products()
@@ -121,13 +137,19 @@ def price_checker():
             if not product["enabled"]:
                 continue
             print(f"Checking price for: {product['url']}")
-            price = get_price(product["url"])
-            if price:
-                print(f"Current price: ₹{price}")
-                if price <= product["target_price"]:
-                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
+            try:
+                price = get_price(product["url"])
+                if price:
+                    print(f"Current price: ₹{price}")
+                    if price <= product["target_price"]:
+                        send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
+                else:
+                    print("Error fetching price")
+            except Exception as e:
+                print("Error:", e)
         time.sleep(CHECK_INTERVAL)
 
+# Flask routes
 @app.route("/")
 def index():
     products = load_products()
