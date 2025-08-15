@@ -5,30 +5,28 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+import time
 
-# ----------------- CONFIG -----------------
 URL = "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011"
-PRICE_SELECTOR = "span#pdp-product-price"  # Unique id selector
+PRICE_SELECTOR = "span#pdp-product-price"  # id selector
 
-# ----------------- SETUP CHROME -----------------
 options = Options()
-options.add_argument("--headless")  # Headless mode (remove if you want browser visible)
+# options.add_argument("--headless")  # Headless temporarily off for debugging
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 
-# ChromeDriver ko automatically download karke use karna
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
 try:
     driver.get(URL)
+    time.sleep(3)  # Page ko render hone ke liye extra wait
 
-    # Price ke liye wait karo (max 10 sec)
-    price_element = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, PRICE_SELECTOR))
+    price_element = WebDriverWait(driver, 15).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, PRICE_SELECTOR))
     )
 
-    price = price_element.text
+    price = price_element.text.strip()
     print(f"Current Price: {price}")
 
 except Exception as e:
