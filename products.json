@@ -1,8 +1,5 @@
 [
-    {
-        "name": "Vivo Y19 5G (4GB RAM, 128GB, Titanium Silver)",
-        "url": "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011",
-        "target_price": 11499,
-        "enabled": true
-    }
+    { "id": "315011", "name": "Vivo Y19 5G (4GB, 128GB, Titanium Silver)" },
+    { "id": "315012", "name": "Samsung Galaxy M14 5G (6GB, 128GB, Blue)" },
+    { "id": "315013", "name": "Realme Narzo 60x 5G (6GB, 128GB, Black)" }
 ]
