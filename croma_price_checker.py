@@ -20,21 +20,14 @@ headers = {
 
 response = requests.get(url, headers=headers)
 response.raise_for_status()
-
 data = response.json()
 
-# Print raw JSON to inspect
-print("API Response:", data)
-
-# Try to extract price if available
-if data and "price" in str(data).lower():
-    # You can adjust key names depending on actual JSON structure
-    try:
-        product_id = list(data.keys())[0]
-        price_info = data[product_id]
-        print("Selling Price:", price_info.get("sellingPrice", "N/A"))
-        print("MRP:", price_info.get("mrp", "N/A"))
-    except Exception as e:
-        print("Could not parse price:", e)
+# Extract price info
+if "pricelist" in data and isinstance(data["pricelist"], list) and len(data["pricelist"]) > 0:
+    price_info = data["pricelist"][0]
+    print(f"Item ID: {price_info.get('itemId')}")
+    print(f"MRP: {price_info.get('mrp')}")
+    print(f"Selling Price: {price_info.get('sellingPrice')}")
+    print(f"Discount: {price_info.get('discountPercentage')}")
 else:
     print("Price data not found in API response.")
