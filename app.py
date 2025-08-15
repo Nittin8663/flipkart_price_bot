@@ -6,6 +6,8 @@ from flask import Flask, render_template_string, request, redirect
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # Load configs
 with open("config.json") as f:
@@ -17,12 +19,12 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-# HTML Template for main page
+# HTML Template
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Croma Price Alert</title>
+<title>Price Alert Bot</title>
 <style>
 body { font-family: Arial; margin: 40px; }
 table { border-collapse: collapse; width: 100%; }
@@ -33,7 +35,7 @@ button { padding: 5px 10px; }
 </style>
 </head>
 <body>
-<h2>Croma Price Alert Bot</h2>
+<h2>Price Alert Bot</h2>
 <table>
 <tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
 {% for p in products %}
@@ -53,7 +55,7 @@ button { padding: 5px 10px; }
 <h3>Add New Product</h3>
 <form method="post" action="/add">
 <input type="text" name="name" placeholder="Product Name" required>
-<input type="text" name="url" placeholder="Croma URL" required>
+<input type="text" name="url" placeholder="Product URL" required>
 <input type="number" name="target_price" placeholder="Target Price" required>
 <button type="submit">Add</button>
 </form>
@@ -61,7 +63,7 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# HTML Template for editing target price
+# HTML for editing price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -83,25 +85,25 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# Product storage
+# Load and save products
 def load_products():
     try:
         with open("products.json") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except:
         return []
 
 def save_products(products):
     with open("products.json", "w") as f:
         json.dump(products, f, indent=4)
 
-# Telegram alert
+# Telegram message
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     requests.post(url, data=data)
 
-# Price fetching from Croma
+# Price fetching
 def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -109,25 +111,25 @@ def get_price(url):
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
-    time.sleep(5)
-    price_selectors = [
-        "div.product-price span",
-        "span#final_price",
-        "span.price",
-        "div.pdp-price span"
-    ]
-    price = None
-    for selector in price_selectors:
-        try:
-            price_element = driver.find_element(By.CSS_SELECTOR, selector)
-            price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-            if price_text:
-                price = int(price_text)
-                break
-        except:
-            continue
-    driver.quit()
-    return price
+    try:
+        if "flipkart.com" in url:
+            price_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
+            )
+        elif "croma.com" in url:
+            price_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "pdp-product-price"))
+            )
+        else:
+            driver.quit()
+            return None
+        price_text = price_element.text.replace("₹", "").replace(",", "").strip()
+        driver.quit()
+        return int(price_text)
+    except Exception as e:
+        print("Error fetching price:", e)
+        driver.quit()
+        return None
 
 # Background price checker
 def price_checker():
@@ -137,16 +139,13 @@ def price_checker():
             if not product["enabled"]:
                 continue
             print(f"Checking price for: {product['url']}")
-            try:
-                price = get_price(product["url"])
-                if price:
-                    print(f"Current price: ₹{price}")
-                    if price <= product["target_price"]:
-                        send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
-                else:
-                    print("Error fetching price")
-            except Exception as e:
-                print("Error:", e)
+            price = get_price(product["url"])
+            if price:
+                print(f"Current price: ₹{price}")
+                if price <= product["target_price"]:
+                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
+            else:
+                print("Price not found.")
         time.sleep(CHECK_INTERVAL)
 
 # Flask routes
