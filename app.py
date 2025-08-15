@@ -85,8 +85,11 @@ button { padding: 5px 10px; }
 """
 
 def load_products():
-    with open("products.json") as f:
-        return json.load(f)
+    try:
+        with open("products.json") as f:
+            return json.load(f)
+    except:
+        return []
 
 def save_products(products):
     with open("products.json", "w") as f:
@@ -103,31 +106,37 @@ def get_price(url):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
+    driver.get(url)
     try:
-        driver.get(url)
-        time.sleep(2)
-
         if "flipkart.com" in url:
-            price_element = WebDriverWait(driver, 15).until(
+            price_element = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
             )
-            price_text = price_element.text
-
+            price_text = price_element.text.replace("₹","").replace(",","").strip()
+            price = int(price_text)
         elif "croma.com" in url:
-            price_element = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "span#pdp-product-price, span.amount"))
-            )
-            price_text = price_element.get_attribute("innerText")
-
+            selectors = ["span#pdp-product-price", "span.amount"]
+            price_text = None
+            for sel in selectors:
+                try:
+                    price_element = WebDriverWait(driver, 15).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, sel))
+                    )
+                    price_text = price_element.get_attribute("textContent").strip()
+                    if price_text:
+                        break
+                except:
+                    continue
+            if not price_text:
+                driver.quit()
+                return None
+            price_text = price_text.replace("₹","").replace(",","").strip()
+            price = int(price_text)
         else:
             driver.quit()
             return None
-
-        price_text = price_text.replace("₹", "").replace(",", "").strip()
-        price = int(float(price_text))
         driver.quit()
         return price
-
     except Exception as e:
         print(f"Error fetching price: {e}")
         driver.quit()
@@ -180,7 +189,7 @@ def toggle(index):
     save_products(products)
     return redirect("/")
 
-@app.route("/edit/<int:index>", methods=["GET", "POST"])
+@app.route("/edit/<int:index>", methods=["GET","POST"])
 def edit(index):
     products = load_products()
     if request.method == "POST":
