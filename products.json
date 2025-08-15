@@ -1,5 +1,14 @@
 [
-    { "id": "315011", "name": "Vivo Y19 5G (4GB, 128GB, Titanium Silver)" },
-    { "id": "315012", "name": "Samsung Galaxy M14 5G (6GB, 128GB, Blue)" },
-    { "id": "315013", "name": "Realme Narzo 60x 5G (6GB, 128GB, Black)" }
+  {
+    "id": "315011",
+    "name": "Vivo Y19 5G (4GB, 128GB, Titanium Silver)",
+    "target_price": 11500,
+    "enabled": true
+  },
+  {
+    "id": "315012",
+    "name": "Samsung Galaxy M14 5G (6GB, 128GB, Blue)",
+    "target_price": 13000,
+    "enabled": true
+  }
 ]
