@@ -63,7 +63,6 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# HTML Template for editing target price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -103,34 +102,36 @@ def get_price_mobile(url):
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("window-size=375,812")
     chrome_options.add_argument(
         "user-agent=Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36"
     )
-    chrome_options.add_argument("window-size=375,812")
 
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
 
+    price_text = None
+    bundle_text = "No bundle discount"
+
     try:
-        # Price
-        wait = WebDriverWait(driver, 10)
-        price_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div._30jeq3._16Jk6d")))
-        price_text = price_element.text.replace("₹","").replace(",","")
-        price = int(price_text)
-
-        # Bundle / Buy Together
-        try:
-            bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together')]/following-sibling::div")
-            bundle_text = bundle_element.text
-        except:
-            bundle_text = "No bundle discount"
-
-        driver.quit()
-        return price, bundle_text
+        wait = WebDriverWait(driver, 15)
+        price_element = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div._30jeq3._16Jk6d"))
+        )
+        price_text = int(price_element.text.replace("₹", "").replace(",", ""))
     except Exception as e:
-        print("Error:", e)
-        driver.quit()
-        return None, None
+        print("Price not found:", e)
+
+    try:
+        bundle_element = driver.find_element(
+            By.XPATH, "//div[contains(text(),'Buy Together')]/following-sibling::div"
+        )
+        bundle_text = bundle_element.text
+    except:
+        bundle_text = "No bundle discount"
+
+    driver.quit()
+    return price_text, bundle_text
 
 def price_checker():
     while True:
@@ -141,12 +142,10 @@ def price_checker():
             print(f"Checking price for: {product['url']}")
             price, bundle = get_price_mobile(product["url"])
             if price:
-                print(f"Current price: ₹{price}, Bundle: {bundle}")
-                message = f"{product['name']} - Current Price: ₹{price}\n{product['url']}\nBundle: {bundle}"
+                print(f"Current price: ₹{price}")
+                print(f"Bundle offer: {bundle}")
                 if price <= product["target_price"]:
-                    send_telegram_message(f"🎯 Price Alert! {message}")
-                elif bundle != "No bundle discount":
-                    send_telegram_message(f"🛒 Bundle Offer! {message}")
+                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\nBundle: {bundle}\n{product['url']}")
         time.sleep(CHECK_INTERVAL)
 
 @app.route("/")
