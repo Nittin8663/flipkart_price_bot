@@ -5,72 +5,43 @@ import requests
 from flask import Flask, render_template_string
 from datetime import datetime
 
-# Load config and products
+# Load config
 with open("config.json", "r") as f:
-    CONFIG = json.load(f)
+    config = json.load(f)
 
 with open("products.json", "r") as f:
-    PRODUCTS = json.load(f)
+    products = json.load(f)
 
-TELEGRAM_BOT_TOKEN = CONFIG["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID = CONFIG["TELEGRAM_CHAT_ID"]
-CHECK_INTERVAL = CONFIG.get("CHECK_INTERVAL", 3600)
+TELEGRAM_BOT_TOKEN = config["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID = config["TELEGRAM_CHAT_ID"]
+CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
-# Flask app
+# Headers (from browser Network tab)
+HEADERS = {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    "channel": "EC",
+    "origin": "https://www.croma.com",
+    "priority": "u=1, i",
+    "referer": "https://www.croma.com/",
+    "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+}
+
 app = Flask(__name__)
+latest_prices = {}
 
-# HTML Template
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Croma Price Tracker</title>
-    <style>
-        body { font-family: Arial; background: #f4f4f4; padding: 20px; }
-        table { border-collapse: collapse; width: 100%; background: white; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        th { background-color: #4CAF50; color: white; }
-    </style>
-</head>
-<body>
-    <h1>Croma Price Tracker</h1>
-    <p>Last Updated: {{ last_updated }}</p>
-    <table>
-        <tr>
-            <th>Product Name</th>
-            <th>MRP</th>
-            <th>Selling Price</th>
-            <th>Discount</th>
-        </tr>
-        {% for product in prices %}
-        <tr>
-            <td>{{ product.name }}</td>
-            <td>{{ product.mrp }}</td>
-            <td>{{ product.selling_price }}</td>
-            <td>{{ product.discount }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-</body>
-</html>
-"""
-
-# Price fetching function
 def fetch_price(product_id):
     url = f"https://api.croma.com/pricing-services/v1/price?productList={product_id}"
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "en-US,en;q=0.9",
-        "channel": "EC",
-        "origin": "https://www.croma.com",
-        "referer": "https://www.croma.com/",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-    }
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         data = response.json()
-
         if "pricelist" in data and len(data["pricelist"]) > 0:
             item = data["pricelist"][0]
             return {
@@ -82,42 +53,79 @@ def fetch_price(product_id):
         print(f"Error fetching price for {product_id}: {e}")
     return None
 
-# Telegram notification
 def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
-        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
-        requests.post(telegram_url, data=payload)
+        requests.post(url, json=payload)
     except Exception as e:
         print(f"Error sending Telegram message: {e}")
 
-# Background task
-def price_checker():
+def check_prices():
+    global latest_prices
     while True:
-        messages = []
-        for product in PRODUCTS:
+        for product in products:
             price_data = fetch_price(product["id"])
             if price_data:
-                messages.append(f"📦 {product['name']}\n💰 {price_data['selling_price']} (MRP: {price_data['mrp']}, Discount: {price_data['discount']})")
-        if messages:
-            send_telegram_message("\n\n".join(messages))
+                latest_prices[product["id"]] = {
+                    "name": product["name"],
+                    "mrp": price_data["mrp"],
+                    "selling_price": price_data["selling_price"],
+                    "discount": price_data["discount"],
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                msg = (
+                    f"{product['name']}\n"
+                    f"MRP: {price_data['mrp']}\n"
+                    f"Selling Price: {price_data['selling_price']}\n"
+                    f"Discount: {price_data['discount']}"
+                )
+                send_telegram_message(msg)
         time.sleep(CHECK_INTERVAL)
 
-# Web route
+# HTML Template inline
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Croma Price Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f8f8; }
+        h1 { text-align: center; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Croma Price Tracker</h1>
+    <table>
+        <tr>
+            <th>Product</th>
+            <th>MRP</th>
+            <th>Selling Price</th>
+            <th>Discount</th>
+            <th>Last Updated</th>
+        </tr>
+        {% for pid, data in prices.items() %}
+        <tr>
+            <td>{{ data.name }}</td>
+            <td>{{ data.mrp }}</td>
+            <td>{{ data.selling_price }}</td>
+            <td>{{ data.discount }}</td>
+            <td>{{ data.time }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+"""
+
 @app.route("/")
-def home():
-    prices = []
-    for product in PRODUCTS:
-        price_data = fetch_price(product["id"])
-        if price_data:
-            prices.append({
-                "name": product["name"],
-                "mrp": price_data["mrp"],
-                "selling_price": price_data["selling_price"],
-                "discount": price_data["discount"]
-            })
-    return render_template_string(HTML_TEMPLATE, prices=prices, last_updated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+def index():
+    return render_template_string(HTML_TEMPLATE, prices=latest_prices)
 
 if __name__ == "__main__":
-    threading.Thread(target=price_checker, daemon=True).start()
+    threading.Thread(target=check_prices, daemon=True).start()
     app.run(host="0.0.0.0", port=5000)
