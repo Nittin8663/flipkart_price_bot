@@ -1,23 +1,8 @@
 [
     {
-        "name": "Realme P3X 5G Midnight Blue 128GB",
-        "url": "https://www.flipkart.com/realme-p3x-5g-midnight-blue-128-gb/p/itmab5a4b09b6ccc",
-        "target_price": 15000,
-        "enabled": true,
-        "bundle_offer": "1"
-    },
-    {
-        "name": "Realme P3 Pro 5G Nebula Glow 256GB",
-        "url": "https://www.flipkart.com/realme-p3-pro-5g-nebula-glow-256-gb/p/itme2d563c696f88",
-        "target_price": 20000,
-        "enabled": true,
-        "bundle_offer": ""
-    },
-    {
-        "name": "POCO M6 Plus 5G Ice Silver 128GB",
-        "url": "https://www.flipkart.com/poco-m6-plus-5g-ice-silver-128-gb/p/itm7e794d10838b4",
-        "target_price": 12000,
-        "enabled": true,
-        "bundle_offer": ""
+        "name": "Vivo Y19 5G (4GB RAM, 128GB, Titanium Silver)",
+        "url": "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011",
+        "target_price": 11499,
+        "enabled": true
     }
 ]
