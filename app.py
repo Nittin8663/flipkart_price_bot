@@ -17,9 +17,71 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-HTML = """..."""  # keep your previous HTML templates
+# HTML Template for main page
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flipkart Price Alert</title>
+<style>
+body { font-family: Arial; margin: 40px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+input[type=text], input[type=number] { width: 100%; padding: 5px; }
+button { padding: 5px 10px; }
+</style>
+</head>
+<body>
+<h2>Flipkart Price Alert Bot</h2>
+<table>
+<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
+{% for p in products %}
+<tr>
+<td>{{ p.name }}</td>
+<td><a href="{{ p.url }}" target="_blank">Link</a></td>
+<td>{{ p.target_price }}</td>
+<td>{{ '✅' if p.enabled else '❌' }}</td>
+<td>
+<a href="/toggle/{{ loop.index0 }}">Toggle</a> |
+<a href="/delete/{{ loop.index0 }}">Delete</a> |
+<a href="/edit/{{ loop.index0 }}">Edit Price</a>
+</td>
+</tr>
+{% endfor %}
+</table>
+<h3>Add New Product</h3>
+<form method="post" action="/add">
+<input type="text" name="name" placeholder="Product Name" required>
+<input type="text" name="url" placeholder="Flipkart URL" required>
+<input type="number" name="target_price" placeholder="Target Price" required>
+<button type="submit">Add</button>
+</form>
+</body>
+</html>
+"""
 
-EDIT_HTML = """..."""  # keep your previous edit template
+# HTML Template for editing target price
+EDIT_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Edit Target Price</title>
+<style>
+body { font-family: Arial; margin: 40px; }
+input[type=number] { width: 100%; padding: 5px; }
+button { padding: 5px 10px; }
+</style>
+</head>
+<body>
+<h2>Edit Target Price for {{ product.name }}</h2>
+<form method="post" action="/edit/{{ index }}">
+<input type="number" name="target_price" value="{{ product.target_price }}" required>
+<button type="submit">Save</button>
+</form>
+</body>
+</html>
+"""
 
 def load_products():
     with open("products.json") as f:
@@ -34,36 +96,37 @@ def send_telegram_message(message):
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     requests.post(url, data=data)
 
-def get_price_and_bundle(url):
+def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Linux; Android 13) Mobile")  # mobile user-agent
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.7258.127 Mobile Safari/537.36")
+    
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
     time.sleep(5)
 
     price = None
-    bundle_text = None
+    bundle_offer = None
 
     try:
-        # Price selector for mobile site
+        # Mobile site price
         price_element = driver.find_element(By.CSS_SELECTOR, "div._30jeq3._16Jk6d")
         price_text = price_element.text.replace("₹", "").replace(",", "")
         price = int(price_text)
     except:
-        price = None
+        pass
 
     try:
-        # Bundle / Buy Together offer selector (mobile site)
-        bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together') or contains(text(),'Bundle Offer')]")
-        bundle_text = bundle_element.text
+        # Mobile site bundle / buy together
+        bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together') or contains(text(),'Bundle')]")
+        bundle_offer = bundle_element.text
     except:
-        bundle_text = None
+        pass
 
     driver.quit()
-    return price, bundle_text
+    return price, bundle_offer
 
 def price_checker():
     while True:
@@ -71,18 +134,18 @@ def price_checker():
         for product in products:
             if not product["enabled"]:
                 continue
-            print(f"Checking price for: {product['name']}")
-            price, bundle = get_price_and_bundle(product["url"])
+            print(f"Checking price for: {product['url']}")
+            price, bundle = get_price(product["url"])
             if price:
                 print(f"Current price: ₹{price}")
+                msg = f"{product['name']} is ₹{price}\n{product['url']}"
+                if bundle:
+                    print(f"Bundle/Offer: {bundle}")
+                    msg += f"\nBundle Offer: {bundle}"
                 if price <= product["target_price"]:
-                    msg = f"Price Alert! {product['name']} is ₹{price}\n{product['url']}"
-                    if bundle:
-                        msg += f"\nBundle Offer: {bundle}"
-                    send_telegram_message(msg)
+                    send_telegram_message(f"Price Alert! {msg}")
         time.sleep(CHECK_INTERVAL)
 
-# Flask routes same as before
 @app.route("/")
 def index():
     products = load_products()
