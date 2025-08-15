@@ -1,211 +1,122 @@
-import time
 import json
+import time
 import threading
 import requests
-from flask import Flask, render_template_string, request, redirect
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from flask import Flask, render_template_string
+from datetime import datetime
 
-# Load configs
-with open("config.json") as f:
-    config = json.load(f)
+# Load config and products
+with open("config.json", "r") as f:
+    CONFIG = json.load(f)
 
-TELEGRAM_BOT_TOKEN = config["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID = config["TELEGRAM_CHAT_ID"]
-CHECK_INTERVAL = config["CHECK_INTERVAL"]
+with open("products.json", "r") as f:
+    PRODUCTS = json.load(f)
 
+TELEGRAM_BOT_TOKEN = CONFIG["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID = CONFIG["TELEGRAM_CHAT_ID"]
+CHECK_INTERVAL = CONFIG.get("CHECK_INTERVAL", 3600)
+
+# Flask app
 app = Flask(__name__)
 
-# HTML Template for main page
-HTML = """
+# HTML Template
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Price Alert Bot</title>
-<style>
-body { font-family: Arial; margin: 40px; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-th { background-color: #f2f2f2; }
-input[type=text], input[type=number] { width: 100%; padding: 5px; }
-button { padding: 5px 10px; }
-</style>
+    <title>Croma Price Tracker</title>
+    <style>
+        body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #4CAF50; color: white; }
+    </style>
 </head>
 <body>
-<h2>Price Alert Bot</h2>
-<table>
-<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
-{% for p in products %}
-<tr>
-<td>{{ p.name }}</td>
-<td><a href="{{ p.url }}" target="_blank">Link</a></td>
-<td>{{ p.target_price }}</td>
-<td>{{ '✅' if p.enabled else '❌' }}</td>
-<td>
-<a href="/toggle/{{ loop.index0 }}">Toggle</a> |
-<a href="/delete/{{ loop.index0 }}">Delete</a> |
-<a href="/edit/{{ loop.index0 }}">Edit Price</a>
-</td>
-</tr>
-{% endfor %}
-</table>
-<h3>Add New Product</h3>
-<form method="post" action="/add">
-<input type="text" name="name" placeholder="Product Name" required>
-<input type="text" name="url" placeholder="Product URL" required>
-<input type="number" name="target_price" placeholder="Target Price" required>
-<button type="submit">Add</button>
-</form>
+    <h1>Croma Price Tracker</h1>
+    <p>Last Updated: {{ last_updated }}</p>
+    <table>
+        <tr>
+            <th>Product Name</th>
+            <th>MRP</th>
+            <th>Selling Price</th>
+            <th>Discount</th>
+        </tr>
+        {% for product in prices %}
+        <tr>
+            <td>{{ product.name }}</td>
+            <td>{{ product.mrp }}</td>
+            <td>{{ product.selling_price }}</td>
+            <td>{{ product.discount }}</td>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 </html>
 """
 
-# HTML Template for editing target price
-EDIT_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Edit Target Price</title>
-<style>
-body { font-family: Arial; margin: 40px; }
-input[type=number] { width: 100%; padding: 5px; }
-button { padding: 5px 10px; }
-</style>
-</head>
-<body>
-<h2>Edit Target Price for {{ product.name }}</h2>
-<form method="post" action="/edit/{{ index }}">
-<input type="number" name="target_price" value="{{ product.target_price }}" required>
-<button type="submit">Save</button>
-</form>
-</body>
-</html>
-"""
-
-# Load and save products
-def load_products():
+# Price fetching function
+def fetch_price(product_id):
+    url = f"https://api.croma.com/pricing-services/v1/price?productList={product_id}"
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "en-US,en;q=0.9",
+        "channel": "EC",
+        "origin": "https://www.croma.com",
+        "referer": "https://www.croma.com/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+    }
     try:
-        with open("products.json") as f:
-            return json.load(f)
-    except:
-        return []
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
 
-def save_products(products):
-    with open("products.json", "w") as f:
-        json.dump(products, f, indent=4)
-
-# Telegram message
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=data)
-
-# Flipkart price
-def get_flipkart_price(driver, url):
-    driver.get(url)
-    try:
-        price_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
-        )
-        price_text = price_element.text.replace("₹", "").replace(",", "")
-        return int(price_text)
-    except:
-        return None
-
-# Croma price
-def get_croma_price(driver, url):
-    driver.get(url)
-    try:
-        price_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "pdp-product-price"))
-        )
-        price_text = price_element.get_attribute("value")
-        return int(price_text.replace(",", ""))
-    except:
-        return None
-
-# Decide which function to use
-def get_price(url):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=chrome_options)
-
-    try:
-        if "flipkart.com" in url:
-            price = get_flipkart_price(driver, url)
-        elif "croma.com" in url:
-            price = get_croma_price(driver, url)
-        else:
-            price = None
+        if "pricelist" in data and len(data["pricelist"]) > 0:
+            item = data["pricelist"][0]
+            return {
+                "mrp": item["mrp"],
+                "selling_price": item["sellingPrice"],
+                "discount": item["discountPercentage"]
+            }
     except Exception as e:
-        print("Error fetching price:", e)
-        price = None
-    driver.quit()
-    return price
+        print(f"Error fetching price for {product_id}: {e}")
+    return None
 
-# Price checker loop
+# Telegram notification
+def send_telegram_message(message):
+    try:
+        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        requests.post(telegram_url, data=payload)
+    except Exception as e:
+        print(f"Error sending Telegram message: {e}")
+
+# Background task
 def price_checker():
     while True:
-        products = load_products()
-        for product in products:
-            if not product["enabled"]:
-                continue
-            print(f"Checking price for: {product['url']}")
-            price = get_price(product["url"])
-            if price:
-                print(f"Current price: ₹{price}")
-                if price <= product["target_price"]:
-                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
-            else:
-                print("Price not found.")
+        messages = []
+        for product in PRODUCTS:
+            price_data = fetch_price(product["id"])
+            if price_data:
+                messages.append(f"📦 {product['name']}\n💰 {price_data['selling_price']} (MRP: {price_data['mrp']}, Discount: {price_data['discount']})")
+        if messages:
+            send_telegram_message("\n\n".join(messages))
         time.sleep(CHECK_INTERVAL)
 
-# Flask routes
+# Web route
 @app.route("/")
-def index():
-    products = load_products()
-    return render_template_string(HTML, products=products)
-
-@app.route("/add", methods=["POST"])
-def add():
-    products = load_products()
-    products.append({
-        "name": request.form["name"],
-        "url": request.form["url"],
-        "target_price": int(request.form["target_price"]),
-        "enabled": True
-    })
-    save_products(products)
-    return redirect("/")
-
-@app.route("/delete/<int:index>")
-def delete(index):
-    products = load_products()
-    products.pop(index)
-    save_products(products)
-    return redirect("/")
-
-@app.route("/toggle/<int:index>")
-def toggle(index):
-    products = load_products()
-    products[index]["enabled"] = not products[index]["enabled"]
-    save_products(products)
-    return redirect("/")
-
-@app.route("/edit/<int:index>", methods=["GET", "POST"])
-def edit(index):
-    products = load_products()
-    if request.method == "POST":
-        products[index]["target_price"] = int(request.form["target_price"])
-        save_products(products)
-        return redirect("/")
-    else:
-        return render_template_string(EDIT_HTML, product=products[index], index=index)
+def home():
+    prices = []
+    for product in PRODUCTS:
+        price_data = fetch_price(product["id"])
+        if price_data:
+            prices.append({
+                "name": product["name"],
+                "mrp": price_data["mrp"],
+                "selling_price": price_data["selling_price"],
+                "discount": price_data["discount"]
+            })
+    return render_template_string(HTML_TEMPLATE, prices=prices, last_updated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 if __name__ == "__main__":
     threading.Thread(target=price_checker, daemon=True).start()
