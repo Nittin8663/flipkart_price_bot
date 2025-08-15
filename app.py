@@ -72,7 +72,6 @@ body { font-family: Arial; margin: 40px; }
 input[type=number] { width: 100%; padding: 5px; }
 button { padding: 5px 10px; }
 </style>
-</head>
 <body>
 <h2>Edit Target Price for {{ product.name }}</h2>
 <form method="post" action="/edit/{{ index }}">
@@ -105,12 +104,13 @@ def get_price(url):
     driver.get(url)
     time.sleep(5)
     try:
-        # Croma price selector (update if website changes)
-        price_element = driver.find_element(By.CSS_SELECTOR, "span#finalPrice")
+        # Croma price selector
+        price_element = driver.find_element(By.CSS_SELECTOR, "span.pdpPrice")
         price_text = price_element.text.replace("₹", "").replace(",", "").strip()
         driver.quit()
         return int(price_text)
-    except:
+    except Exception as e:
+        print("Error fetching price:", e)
         driver.quit()
         return None
 
