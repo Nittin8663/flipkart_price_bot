@@ -22,7 +22,7 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Flipkart Price Alert</title>
+<title>Croma Price Alert</title>
 <style>
 body { font-family: Arial; margin: 40px; }
 table { border-collapse: collapse; width: 100%; }
@@ -33,15 +33,14 @@ button { padding: 5px 10px; }
 </style>
 </head>
 <body>
-<h2>Flipkart Price Alert Bot</h2>
+<h2>Croma Price Alert Bot</h2>
 <table>
-<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Bundle Price</th><th>Enabled</th><th>Actions</th></tr>
+<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
 {% for p in products %}
 <tr>
 <td>{{ p.name }}</td>
 <td><a href="{{ p.url }}" target="_blank">Link</a></td>
 <td>{{ p.target_price }}</td>
-<td>{{ p.bundle_price if p.bundle_price else '-' }}</td>
 <td>{{ '✅' if p.enabled else '❌' }}</td>
 <td>
 <a href="/toggle/{{ loop.index0 }}">Toggle</a> |
@@ -54,7 +53,7 @@ button { padding: 5px 10px; }
 <h3>Add New Product</h3>
 <form method="post" action="/add">
 <input type="text" name="name" placeholder="Product Name" required>
-<input type="text" name="url" placeholder="Flipkart URL" required>
+<input type="text" name="url" placeholder="Croma URL" required>
 <input type="number" name="target_price" placeholder="Target Price" required>
 <button type="submit">Add</button>
 </form>
@@ -99,61 +98,34 @@ def send_telegram_message(message):
 
 def get_price(url):
     chrome_options = Options()
-    # Mobile user-agent
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument(
-        "user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
-    )
-
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
     time.sleep(5)
-
-    price, bundle_price = None, None
     try:
-        # Normal price
-        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
+        # Croma price selector (update if website changes)
+        price_element = driver.find_element(By.CSS_SELECTOR, "span#finalPrice")
         price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-        price = int(price_text)
+        driver.quit()
+        return int(price_text)
     except:
-        pass
-
-    try:
-        # Bundle price / Buy Together
-        bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together')]/following-sibling::div")
-        bundle_text = bundle_element.text.replace("₹", "").replace(",", "").strip()
-        if bundle_text:
-            bundle_price = int(bundle_text)
-    except:
-        pass
-
-    driver.quit()
-    return price, bundle_price
+        driver.quit()
+        return None
 
 def price_checker():
     while True:
         products = load_products()
-        updated = False
         for product in products:
             if not product["enabled"]:
                 continue
             print(f"Checking price for: {product['url']}")
-            price, bundle_price = get_price(product["url"])
-            product["bundle_price"] = bundle_price
+            price = get_price(product["url"])
             if price:
                 print(f"Current price: ₹{price}")
                 if price <= product["target_price"]:
                     send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
-            if bundle_price:
-                print(f"Bundle price: ₹{bundle_price}")
-                if bundle_price <= product["target_price"]:
-                    send_telegram_message(f"Bundle Offer Alert! {product['name']} is ₹{bundle_price}\n{product['url']}")
-            updated = True
-        if updated:
-            save_products(products)
         time.sleep(CHECK_INTERVAL)
 
 @app.route("/")
@@ -168,8 +140,7 @@ def add():
         "name": request.form["name"],
         "url": request.form["url"],
         "target_price": int(request.form["target_price"]),
-        "enabled": True,
-        "bundle_price": None
+        "enabled": True
     })
     save_products(products)
     return redirect("/")
