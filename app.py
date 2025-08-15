@@ -35,17 +35,18 @@ button { padding: 5px 10px; }
 <body>
 <h2>Flipkart Price Alert Bot</h2>
 <table>
-<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
+<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Bundle Offer</th><th>Enabled</th><th>Actions</th></tr>
 {% for p in products %}
 <tr>
 <td>{{ p.name }}</td>
 <td><a href="{{ p.url }}" target="_blank">Link</a></td>
 <td>{{ p.target_price }}</td>
+<td>{{ p.bundle_offer if p.bundle_offer else '-' }}</td>
 <td>{{ '✅' if p.enabled else '❌' }}</td>
 <td>
 <a href="/toggle/{{ loop.index0 }}">Toggle</a> |
 <a href="/delete/{{ loop.index0 }}">Delete</a> |
-<a href="/edit/{{ loop.index0 }}">Edit Price</a>
+<a href="/edit/{{ loop.index0 }}">Edit</a>
 </td>
 </tr>
 {% endfor %}
@@ -55,28 +56,32 @@ button { padding: 5px 10px; }
 <input type="text" name="name" placeholder="Product Name" required>
 <input type="text" name="url" placeholder="Flipkart URL" required>
 <input type="number" name="target_price" placeholder="Target Price" required>
+<input type="text" name="bundle_offer" placeholder="Bundle Offer (optional)">
 <button type="submit">Add</button>
 </form>
 </body>
 </html>
 """
 
-# HTML Template for editing target price
+# HTML Template for editing product
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Edit Target Price</title>
+<title>Edit Product</title>
 <style>
 body { font-family: Arial; margin: 40px; }
-input[type=number] { width: 100%; padding: 5px; }
+input[type=text], input[type=number] { width: 100%; padding: 5px; }
 button { padding: 5px 10px; }
 </style>
 </head>
 <body>
-<h2>Edit Target Price for {{ product.name }}</h2>
+<h2>Edit Target Price & Bundle Offer for {{ product.name }}</h2>
 <form method="post" action="/edit/{{ index }}">
 <input type="number" name="target_price" value="{{ product.target_price }}" required>
+<br><br>
+<input type="text" name="bundle_offer" value="{{ product.get('bundle_offer','') }}" placeholder="Bundle Offer">
+<br><br>
 <button type="submit">Save</button>
 </form>
 </body>
@@ -101,29 +106,25 @@ def get_price(url):
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.7258.127 Mobile Safari/537.36")
-    
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
     time.sleep(5)
-
     price = None
-    bundle_offer = None
-
+    bundle_offer = ""
     try:
-        # Mobile site price
-        price_element = driver.find_element(By.CSS_SELECTOR, "div._30jeq3._16Jk6d")
+        # Mobile site specific price
+        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
         price_text = price_element.text.replace("₹", "").replace(",", "")
         price = int(price_text)
     except:
-        pass
+        price = None
 
     try:
-        # Mobile site bundle / buy together
-        bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together') or contains(text(),'Bundle')]")
-        bundle_offer = bundle_element.text
+        # Mobile site specific bundle/offer
+        bundle_element = driver.find_element(By.XPATH, "//div[contains(text(),'Buy Together') or contains(text(),'Bundle Offer')]")
+        bundle_offer = bundle_element.text.strip()
     except:
-        pass
+        bundle_offer = ""
 
     driver.quit()
     return price, bundle_offer
@@ -135,15 +136,17 @@ def price_checker():
             if not product["enabled"]:
                 continue
             print(f"Checking price for: {product['url']}")
-            price, bundle = get_price(product["url"])
+            price, bundle_offer = get_price(product["url"])
             if price:
                 print(f"Current price: ₹{price}")
-                msg = f"{product['name']} is ₹{price}\n{product['url']}"
-                if bundle:
-                    print(f"Bundle/Offer: {bundle}")
-                    msg += f"\nBundle Offer: {bundle}"
+                if bundle_offer:
+                    product["bundle_offer"] = bundle_offer
+                    save_products(products)
                 if price <= product["target_price"]:
-                    send_telegram_message(f"Price Alert! {msg}")
+                    message = f"Price Alert! {product['name']} is ₹{price}\n{product['url']}"
+                    if bundle_offer:
+                        message += f"\nOffer: {bundle_offer}"
+                    send_telegram_message(message)
         time.sleep(CHECK_INTERVAL)
 
 @app.route("/")
@@ -158,7 +161,8 @@ def add():
         "name": request.form["name"],
         "url": request.form["url"],
         "target_price": int(request.form["target_price"]),
-        "enabled": True
+        "enabled": True,
+        "bundle_offer": request.form.get("bundle_offer", "")
     })
     save_products(products)
     return redirect("/")
@@ -182,6 +186,7 @@ def edit(index):
     products = load_products()
     if request.method == "POST":
         products[index]["target_price"] = int(request.form["target_price"])
+        products[index]["bundle_offer"] = request.form.get("bundle_offer", "")
         save_products(products)
         return redirect("/")
     else:
