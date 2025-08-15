@@ -1,32 +1,32 @@
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 
-def fetch_price(product_id):
-    url = f"https://api.croma.com/pricing-services/v1/price?productList={product_id}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+# Chrome options
+options = Options()
+options.add_argument("--headless")  # Headless mode
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # HTTP error raise karega
+# Driver setup
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=options)
 
-        data = response.json()
+# Croma product URL (yahan apna product URL daalein)
+url = "https://www.croma.com/product/315011"  
 
-        # Price extract karna
-        if "productList" in data and len(data["productList"]) > 0:
-            price = data["productList"][0].get("price")
-            currency = data["productList"][0].get("currency", "INR")
-            print(f"Product ID {product_id} Price: {currency} {price}")
-        else:
-            print(f"Price not found for Product ID {product_id}")
+driver.get(url)
+time.sleep(3)  # Page load ke liye wait
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching price for Product ID {product_id}: {e}")
+try:
+    # Price selector
+    price_element = driver.find_element(By.CSS_SELECTOR, "span.amount[data-testid='new-price']")
+    price = price_element.text
+    print(f"Price: {price}")
+except Exception as e:
+    print("Price not found or error:", e)
 
-# --- Test Script ---
-if __name__ == "__main__":
-    # Test product IDs (example)
-    test_product_ids = ["315011", "315012", "315013"]
-
-    for pid in test_product_ids:
-        fetch_price(pid)
+driver.quit()
