@@ -19,12 +19,12 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-# HTML Template for main page
+# HTML Template
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Price Alert</title>
+<title>Price Alert Bot</title>
 <style>
 body { font-family: Arial; margin: 40px; }
 table { border-collapse: collapse; width: 100%; }
@@ -63,7 +63,6 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# HTML Template for editing target price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -86,11 +85,8 @@ button { padding: 5px 10px; }
 """
 
 def load_products():
-    try:
-        with open("products.json") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+    with open("products.json") as f:
+        return json.load(f)
 
 def save_products(products):
     with open("products.json", "w") as f:
@@ -109,19 +105,19 @@ def get_price(url):
     driver = webdriver.Chrome(options=chrome_options)
     try:
         driver.get(url)
-        time.sleep(3)  # Page load wait
+        time.sleep(2)
 
         if "flipkart.com" in url:
             price_element = WebDriverWait(driver, 15).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
             )
             price_text = price_element.text
 
         elif "croma.com" in url:
             price_element = WebDriverWait(driver, 15).until(
-                EC.visibility_of_element_located((By.ID, "pdp-product-price"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "span#pdp-product-price, span.amount"))
             )
-            price_text = price_element.text
+            price_text = price_element.get_attribute("innerText")
 
         else:
             driver.quit()
