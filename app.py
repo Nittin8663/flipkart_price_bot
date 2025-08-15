@@ -19,12 +19,12 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-# HTML Templates
+# HTML Template for main page
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Price Alert Bot</title>
+<title>Price Alert</title>
 <style>
 body { font-family: Arial; margin: 40px; }
 table { border-collapse: collapse; width: 100%; }
@@ -63,6 +63,7 @@ button { padding: 5px 10px; }
 </html>
 """
 
+# HTML Template for editing target price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -84,60 +85,58 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# Product file handling
 def load_products():
     try:
         with open("products.json") as f:
             return json.load(f)
-    except:
+    except FileNotFoundError:
         return []
 
 def save_products(products):
     with open("products.json", "w") as f:
         json.dump(products, f, indent=4)
 
-# Telegram notification
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     requests.post(url, data=data)
 
-# Price fetching
 def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    time.sleep(2)
-
     try:
-        # Flipkart price
+        driver.get(url)
+        time.sleep(3)  # Page load wait
+
         if "flipkart.com" in url:
-            price_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
+            price_element = WebDriverWait(driver, 15).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
             )
-            price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-        # Croma price
+            price_text = price_element.text
+
         elif "croma.com" in url:
             price_element = WebDriverWait(driver, 15).until(
                 EC.visibility_of_element_located((By.ID, "pdp-product-price"))
             )
-            price_text = price_element.get_attribute("value") or price_element.text
-            price_text = price_text.replace("₹", "").replace(",", "").strip()
+            price_text = price_element.text
+
         else:
             driver.quit()
             return None
 
+        price_text = price_text.replace("₹", "").replace(",", "").strip()
+        price = int(float(price_text))
         driver.quit()
-        return int(price_text)
+        return price
+
     except Exception as e:
-        print("Error fetching price:", e)
+        print(f"Error fetching price: {e}")
         driver.quit()
         return None
 
-# Price checker thread
 def price_checker():
     while True:
         products = load_products()
@@ -154,7 +153,6 @@ def price_checker():
                 print("Price not found.")
         time.sleep(CHECK_INTERVAL)
 
-# Flask routes
 @app.route("/")
 def index():
     products = load_products()
