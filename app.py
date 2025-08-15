@@ -19,7 +19,7 @@ CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
 app = Flask(__name__)
 
-# HTML Template
+# HTML Templates
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -63,7 +63,6 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# HTML for editing price
 EDIT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -85,7 +84,7 @@ button { padding: 5px 10px; }
 </html>
 """
 
-# Load and save products
+# Product file handling
 def load_products():
     try:
         with open("products.json") as f:
@@ -97,7 +96,7 @@ def save_products(products):
     with open("products.json", "w") as f:
         json.dump(products, f, indent=4)
 
-# Telegram message
+# Telegram notification
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
@@ -111,19 +110,26 @@ def get_price(url):
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
+    time.sleep(2)
+
     try:
+        # Flipkart price
         if "flipkart.com" in url:
             price_element = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd"))
             )
+            price_text = price_element.text.replace("₹", "").replace(",", "").strip()
+        # Croma price
         elif "croma.com" in url:
-            price_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "pdp-product-price"))
+            price_element = WebDriverWait(driver, 15).until(
+                EC.visibility_of_element_located((By.ID, "pdp-product-price"))
             )
+            price_text = price_element.get_attribute("value") or price_element.text
+            price_text = price_text.replace("₹", "").replace(",", "").strip()
         else:
             driver.quit()
             return None
-        price_text = price_element.text.replace("₹", "").replace(",", "").strip()
+
         driver.quit()
         return int(price_text)
     except Exception as e:
@@ -131,7 +137,7 @@ def get_price(url):
         driver.quit()
         return None
 
-# Background price checker
+# Price checker thread
 def price_checker():
     while True:
         products = load_products()
