@@ -1,6 +1,5 @@
 import requests
 
-# 🔹 Bas yaha apna product code daalo
 product_code = "314064"
 
 url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
@@ -16,16 +15,16 @@ headers = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
 }
 
-data = {
-    "getApplicablePromotionsForItemRequest": {
-        "itemId": product_code,
-        "programId": "01eae2ec-0576-1000-bbea-86e16dcb4b79",
-        "channelIds": ["TCPCHS0003"],
-        "status": "ACTIVE",
-    }
-}
+# 🔹 yaha form-data jaisa raw string banana hoga
+payload = (
+    '{"getApplicablePromotionsForItemRequest":{'
+    f'"itemId":"{product_code}",'
+    '"programId":"01eae2ec-0576-1000-bbea-86e16dcb4b79",'
+    '"channelIds":["TCPCHS0003"],'
+    '"status":"ACTIVE"}}'
+)
 
-response = requests.post(url, headers=headers, json=data)
+response = requests.post(url, headers=headers, data=payload)
 
 print("Status Code:", response.status_code)
-print("Response JSON:", response.json() if response.status_code == 200 else response.text)
+print("Response Text:", response.text)
