@@ -1,32 +1,41 @@
-import requests
+from seleniumwire import webdriver
+import json
+import time
 
-url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
+# Product page
+URL = "https://www.croma.com/apple-macbook-air-13-6-inch-m4-16gb-256gb-macos-sky-blue-/p/314064"
 
-headers = {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "en-US,en;q=0.9",
-    "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",  # <-- apna valid token yaha daalo
-    "client_id": "CROMA",
-    "content-type": "application/json",
-    "origin": "https://www.croma.com",
-    "referer": "https://www.croma.com/",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-    "cookie": (
-        "ak_bmsc=CD9D25F25DA20D7D541AD3CF8EB1DB22~0000...;"  # <-- full cookie paste karo
-        " bm_sz=0B804A842B54CBEB6D441928DA0967C3~YAAQ..."
-    )
-}
+# Start Selenium browser
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")   # remove this if you want to see the browser
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
 
-payload = {
-    "getApplicablePromotionsForItemRequest": {
-        "itemId": "314064",
-        "programId": "01eae2ec-0576-1000-bbea-86e16dcb4b79",
-        "channelIds": ["TCPCHS0003"],
-        "status": "ACTIVE"
-    }
-}
+driver = webdriver.Chrome(seleniumwire_options={}, options=options)
 
-response = requests.post(url, headers=headers, json=payload)
+try:
+    print("Opening product page...")
+    driver.get(URL)
 
-print("Status:", response.status_code)
-print("Response:", response.text)
+    # wait for network calls to complete
+    time.sleep(8)
+
+    # check network requests
+    for request in driver.requests:
+        if request.response and "getApplicationPromotionsForItemOffer" in request.url:
+            print(f"\n✅ Found Promotions API: {request.url}")
+            print(f"Status: {request.response.status_code}")
+
+            try:
+                body = request.response.body.decode("utf-8")
+                data = json.loads(body)
+                print("\n--- Promotions JSON ---")
+                print(json.dumps(data, indent=2))
+            except Exception as e:
+                print("⚠️ Could not parse JSON:", e)
+            break
+    else:
+        print("❌ Promotions API call not found. Maybe increase sleep time.")
+
+finally:
+    driver.quit()
