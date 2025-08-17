@@ -1,18 +1,24 @@
 from selenium import webdriver
-import time
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import tempfile
 
-def fetch_croma_promotions(product_url):
-    driver = webdriver.Chrome()
-    driver.get(product_url)
+def fetch_croma():
+    options = Options()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
 
-    time.sleep(6)  # thoda load hone do
+    # unique temp profile dir
+    temp_profile = tempfile.mkdtemp()
+    options.add_argument(f"--user-data-dir={temp_profile}")
 
-    # Network sniff karna hoga (ya directly page JS run karke fetch)
-    # Simple placeholder abhi ke liye:
-    print("Page Loaded:", driver.title)
+    driver = webdriver.Chrome(options=options)
+    driver.get("https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011")
 
+    print(driver.title)
     driver.quit()
 
 if __name__ == "__main__":
-    url = "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011"
-    fetch_croma_promotions(url)
+    fetch_croma()
