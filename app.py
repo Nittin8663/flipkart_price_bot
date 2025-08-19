@@ -1,5 +1,6 @@
 import json
 import requests
+import re
 from flask import Flask, request, redirect, url_for
 from threading import Thread
 from datetime import datetime
@@ -58,22 +59,35 @@ def fetch_price(product_id):
     return None
 
 def fetch_promotion_offer(product_id):
-    url = f"https://api.tatadigital.com/api/v1/commerce/benefit-offers?skuId={product_id}&category=electronics&pinCode=400001&categoryId=10"
+    url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "origin": "https://www.croma.com",
+        "referer": "https://www.croma.com/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+        "content-type": "application/json"
+    }
+    payload = {"skuId": product_id}
     try:
-        r = requests.get(url)
+        r = requests.post(url, headers=headers, json=payload)
         r.raise_for_status()
         data = r.json()
         offers = []
-        try:
-            offers_list = data["data"]["bestBenefitValue"]["nonExchangeBenefit"]["productTransactionOffers"]
-            for offer in offers_list:
-                offers.append({
-                    "title": offer.get("offerTitle", ""),
-                    "desc": offer.get("offerDescription", ""),
-                    "saving": offer.get("promotionSavings", 0)
-                })
-        except Exception:
-            pass
+        offer_list = (
+            data.get("getApplicablePromotionsForItemResponse", {})
+            .get("offerDetailsList", [])
+        )
+        for offer in offer_list:
+            title = offer.get("offerTitle", "")
+            desc = offer.get("description", "")
+            # Find Rs.XXXX off
+            match = re.search(r'Rs\.?\s?([0-9]+)', title)
+            saving = float(match.group(1)) if match else 0
+            offers.append({
+                "title": title,
+                "desc": desc,
+                "saving": saving
+            })
         return offers
     except Exception as e:
         print(f"Promotion fetch error: {e}")
