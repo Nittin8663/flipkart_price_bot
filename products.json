@@ -1,14 +1,9 @@
 [
   {
-    "id": "315011",
-    "name": "Vivo Y19 5G (4GB, 128GB, Titanium Silver)",
-    "target_price": 11500,
-    "enabled": true
-  },
-  {
-    "id": "315012",
-    "name": "Samsung Galaxy M14 5G (6GB, 128GB, Blue)",
+    "id": "312576",
+    "name": "vivo-y29-5g-6gb-ram-128gb-glacier-blue",
     "target_price": 13000,
+    "target_promotion": 2000,
     "enabled": true
   }
 ]
