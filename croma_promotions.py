@@ -1,68 +1,49 @@
-import json
+import requests
 
-response_data = {
-    "path": "/v1/product/benefit-offers",
-    "timestamp": "2025-08-19T19:56:11.103Z",
-    "data": {
-        "bestBenefitValue": {
-            "exchangeBenefit": {
-                "bankOffers": [],
-                "productTransactionOffers": [
-                    {
-                        "promotionId": "01eae2ec-0576-1000-bbea-86e16dcb4b79:CROMA90676",
-                        "offerType": "MULTIBUYGROUP",
-                        "offerTitle": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
-                        "offerDescription": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
-                        "expiry": "",
-                        "promotionSavings": 1450.0,
-                        "termsAndConditions": []
-                    }
-                ],
-                "couponOffers": []
-            },
-            "nonExchangeBenefit": {
-                "bankOffers": [],
-                "productTransactionOffers": [
-                    {
-                        "promotionId": "01eae2ec-0576-1000-bbea-86e16dcb4b79:CROMA90676",
-                        "offerType": "MULTIBUYGROUP",
-                        "offerTitle": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
-                        "offerDescription": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
-                        "expiry": "",
-                        "promotionSavings": 1450.0,
-                        "termsAndConditions": []
-                    }
-                ],
-                "couponOffers": []
-            }
-        }
+def fetch_benefit_offers(sku_id, category, pin_code, category_id):
+    url = (
+        "https://api.tatadigital.com/api/v1/commerce/benefit-offers"
+        f"?skuId={sku_id}&category={category}&pinCode={pin_code}&categoryId={category_id}"
+    )
+    headers = {
+        "accept": "application/json",
+        # Add other headers if needed for successful response
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "origin": "https://www.tataneu.com",
+        "referer": "https://www.tataneu.com/",
     }
-}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    data = response.json()
 
-def extract_promotions(data):
-    benefits = data.get('data', {}).get('bestBenefitValue', {})
-    results = []
+    offers = []
+    best_benefit = data.get("data", {}).get("bestBenefitValue", {})
 
-    for section in ['exchangeBenefit', 'nonExchangeBenefit']:
-        benefit = benefits.get(section, {})
-        for offer in benefit.get('productTransactionOffers', []):
-            results.append({
-                "section": section,
+    for benefit_type in ["exchangeBenefit", "nonExchangeBenefit"]:
+        benefit = best_benefit.get(benefit_type, {})
+        for offer in benefit.get("productTransactionOffers", []):
+            offers.append({
+                "section": benefit_type,
                 "title": offer.get("offerTitle"),
                 "description": offer.get("offerDescription"),
                 "savings": offer.get("promotionSavings"),
                 "type": offer.get("offerType"),
                 "promotionId": offer.get("promotionId")
             })
-    return results
+    return offers
 
-promotions = extract_promotions(response_data)
-
-for promo in promotions:
-    print(f"Section: {promo['section']}")
-    print(f"Title: {promo['title']}")
-    print(f"Description: {promo['description']}")
-    print(f"Savings: Rs.{promo['savings']}")
-    print(f"Type: {promo['type']}")
-    print(f"Promotion ID: {promo['promotionId']}")
+# Example usage:
+offers = fetch_benefit_offers(
+    sku_id="312576",
+    category="electronics",
+    pin_code="400001",
+    category_id="10"
+)
+for offer in offers:
+    print(f"Section: {offer['section']}")
+    print(f"Title: {offer['title']}")
+    print(f"Description: {offer['description']}")
+    print(f"Savings: {offer['savings']}")
+    print(f"Type: {offer['type']}")
+    print(f"Promotion ID: {offer['promotionId']}")
     print("-" * 40)
