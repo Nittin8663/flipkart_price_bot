@@ -1,29 +1,22 @@
 import requests
 
-def get_croma_price(product_id):
-    url = f"https://api.croma.com/pricing-services/v1/price?productList={product_id}"
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "origin": "https://www.croma.com",
-        "referer": "https://www.croma.com/",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-    }
-    r = requests.get(url, headers=headers)
-    print("Status Code:", r.status_code)
-    if r.status_code == 200:
-        try:
-            data = r.json()
-            priceinfo = data.get("pricelist", [{}])[0]
-            print("Product ID:", priceinfo.get("productId"))
-            print("MRP:", priceinfo.get("mrp"))
-            print("Selling Price:", priceinfo.get("sellingPriceValue"))
-            print("Discount %:", priceinfo.get("discountPercentage"))
-        except Exception as e:
-            print("JSON Error:", e)
-            print("Response Text:", r.text)
-    else:
-        print("Error Response:", r.text)
+url = "https://api.croma.com/offer/allchannels/v2/detail"
 
-if __name__ == "__main__":
-    product_id = "312576"  # Yahan apna product id daalein
-    get_croma_price(product_id)
+headers = {
+    "accept": "application/json, text/plain, */*",
+    "accesstoken": "e55236f3-a403-4c77-912a-13c53b4a0e28",
+    "client_id": "CROMA-WEB-APP",
+    "customerhash": "1ca343547f343c432b0c3dbb7ab2c4c9",
+    "origin": "https://www.croma.com",
+    "referer": "https://www.croma.com/",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    "content-type": "application/json"
+}
+
+payload = {
+    # Yaha apna actual payload daalo
+}
+
+response = requests.post(url, headers=headers, json=payload)
+print(response.status_code)
+print(response.text)
