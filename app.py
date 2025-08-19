@@ -6,21 +6,19 @@ from datetime import datetime
 import time
 import os
 
-# Load config
-with open("config.json") as f:
+# --- CONFIG ---
+with open("telegram.json") as f:
     CONFIG = json.load(f)
 
 BOT_TOKEN = CONFIG["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = CONFIG["TELEGRAM_CHAT_ID"]
-CHECK_INTERVAL = CONFIG["CHECK_INTERVAL"]
+CHECK_INTERVAL = CONFIG.get("CHECK_INTERVAL", 600)
 
-# File for products
 PRODUCTS_FILE = "products.json"
 
 app = Flask(__name__)
 
-# ------------------ Helpers ------------------
-
+# --- HELPERS ---
 def load_products():
     if not os.path.exists(PRODUCTS_FILE):
         return []
@@ -59,6 +57,28 @@ def fetch_price(product_id):
         return data["pricelist"][0]
     return None
 
+def fetch_promotion_offer(product_id):
+    url = f"https://api.tatadigital.com/api/v1/commerce/benefit-offers?skuId={product_id}&category=electronics&pinCode=400001&categoryId=10"
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        data = r.json()
+        offers = []
+        try:
+            offers_list = data["data"]["bestBenefitValue"]["nonExchangeBenefit"]["productTransactionOffers"]
+            for offer in offers_list:
+                offers.append({
+                    "title": offer.get("offerTitle", ""),
+                    "desc": offer.get("offerDescription", ""),
+                    "saving": offer.get("promotionSavings", 0)
+                })
+        except Exception:
+            pass
+        return offers
+    except Exception as e:
+        print(f"Promotion fetch error: {e}")
+        return []
+
 def check_prices():
     products = load_products()
     for p in products:
@@ -74,11 +94,27 @@ def check_prices():
             p["last_checked"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             p["last_price"] = selling
 
-            print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}")
+            # --- Promotion Offer Fetch ---
+            promotions = fetch_promotion_offer(p["id"])
+            promo_text = ""
+            promo_alert = False
+            target_promotion = p.get("target_promotion")
+            if promotions:
+                for promo in promotions:
+                    promo_text += f"\nOffer: {promo['title']} | Save: ₹{promo['saving']}"
+                    # Promotion alert: if any offer saving >= target_promotion
+                    if target_promotion and float(promo["saving"]) >= float(target_promotion):
+                        promo_alert = True
 
-            if p.get("target_price") and float(selling) <= float(p["target_price"]):
+            print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}{promo_text}")
+
+            # Alert condition: selling price <= target OR promo saving >= target_promotion
+            if (
+                (p.get("target_price") and float(selling) <= float(p["target_price"]))
+                or promo_alert
+            ):
                 send_telegram_message(
-                    f"Price Drop Alert!\n{p['name']}\nMRP: {mrp}\nPrice: ₹{selling}\nDiscount: {discount}"
+                    f"Price/Offer Alert!\n{p['name']}\nMRP: {mrp}\nPrice: ₹{selling}\nDiscount: {discount}{promo_text}"
                 )
 
         except Exception as e:
@@ -90,8 +126,7 @@ def background_checker():
         check_prices()
         time.sleep(CHECK_INTERVAL)
 
-# ------------------ Routes ------------------
-
+# --- ROUTES ---
 @app.route("/")
 def index():
     products = load_products()
@@ -118,6 +153,7 @@ def index():
     <tr>
         <th>Name</th>
         <th>Target Price</th>
+        <th>Target Promotion</th>
         <th>Last Price</th>
         <th>Last Checked</th>
         <th>Status</th>
@@ -125,10 +161,17 @@ def index():
     </tr>
     """
     for p in products:
+        # Fetch promotion offers for display in UI
+        promotions = fetch_promotion_offer(p["id"])
+        promo_html = ""
+        if promotions:
+            for promo in promotions:
+                promo_html += f"<div><b>{promo['title']}</b> <span style='color:green'>(Save: ₹{promo['saving']})</span></div>"
         html += f"""
         <tr>
-            <td>{p['name']}</td>
+            <td>{p['name']}<br>{promo_html}</td>
             <td>{p.get('target_price', '')}</td>
+            <td>{p.get('target_promotion', '')}</td>
             <td>{p.get('last_price', '')}</td>
             <td>{p.get('last_checked', '')}</td>
             <td>{"Enabled" if p.get('enabled', True) else "Disabled"}</td>
@@ -151,6 +194,7 @@ def edit_product(product_id):
 
     if request.method == "POST":
         product["target_price"] = float(request.form["target_price"])
+        product["target_promotion"] = float(request.form["target_promotion"])
         save_products(products)
         Thread(target=check_prices).start()
         return redirect(url_for("index"))
@@ -159,7 +203,8 @@ def edit_product(product_id):
     <html><body>
     <h1>Edit {product['name']}</h1>
     <form method='POST'>
-        Target Price: <input type='number' step='0.01' name='target_price' value='{product.get("target_price", "")}' required>
+        Target Price: <input type='number' step='0.01' name='target_price' value='{product.get("target_price", "")}' required><br><br>
+        Target Promotion (save amount): <input type='number' step='0.01' name='target_promotion' value='{product.get("target_promotion", "")}' required><br><br>
         <input type='submit' value='Save'>
     </form>
     </body></html>
@@ -188,6 +233,7 @@ def add_product():
             "id": request.form["id"],
             "name": request.form["name"],
             "target_price": float(request.form["target_price"]),
+            "target_promotion": float(request.form["target_promotion"]),
             "enabled": True
         }
         products.append(new_product)
@@ -200,12 +246,11 @@ def add_product():
         Product ID: <input type='text' name='id' required><br><br>
         Name: <input type='text' name='name' required><br><br>
         Target Price: <input type='number' step='0.01' name='target_price' required><br><br>
+        Target Promotion (save amount): <input type='number' step='0.01' name='target_promotion' required><br><br>
         <input type='submit' value='Add Product'>
     </form>
     </body></html>
     """
-
-# ------------------ Start ------------------
 
 if __name__ == "__main__":
     Thread(target=background_checker, daemon=True).start()
