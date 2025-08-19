@@ -1,32 +1,68 @@
-import requests
+import json
 
-url = "https://api.tatadigital.com/api/v1/commerce/benefit-offers?skuId=312576&category=electronics&pinCode=400001&categoryId=10"
-
-headers = {
-    "accept": "*/*",
-    "accept-language": "en-US,en;q=0.9",
-    "anonymous_id": "8cd4bc58-0c0c-48e0-a19b-661e1cba7fb6",
-    "client_id": "TCP-WEB-APP",
-    "client_secret": "6fe27bd7-658d-4d28-ab66-a71da9637529",
-    "content-type": "application/json",
-    "jarvissessionid": "c4ecacb8-dbaf-4548-a80e-5678503b5abb",
-    "neu-app-version": "6.1.0",
-    "origin": "https://www.tataneu.com",
-    "priority": "u=1, i",
-    "programid": "01eae2ec-0576-1000-bbea-86e16dcb4b79",
-    "referer": "https://www.tataneu.com/",
-    "request_id": "01c1850f-78c5-4baa-9b23-2bbe77d15dae",
-    "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"Windows"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "cross-site",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-    "x-offer-benefit-threshold": "50"
+response_data = {
+    "path": "/v1/product/benefit-offers",
+    "timestamp": "2025-08-19T19:56:11.103Z",
+    "data": {
+        "bestBenefitValue": {
+            "exchangeBenefit": {
+                "bankOffers": [],
+                "productTransactionOffers": [
+                    {
+                        "promotionId": "01eae2ec-0576-1000-bbea-86e16dcb4b79:CROMA90676",
+                        "offerType": "MULTIBUYGROUP",
+                        "offerTitle": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
+                        "offerDescription": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
+                        "expiry": "",
+                        "promotionSavings": 1450.0,
+                        "termsAndConditions": []
+                    }
+                ],
+                "couponOffers": []
+            },
+            "nonExchangeBenefit": {
+                "bankOffers": [],
+                "productTransactionOffers": [
+                    {
+                        "promotionId": "01eae2ec-0576-1000-bbea-86e16dcb4b79:CROMA90676",
+                        "offerType": "MULTIBUYGROUP",
+                        "offerTitle": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
+                        "offerDescription": "Tata Neu Offer - Get Rs.1450 off (applicable only on Tataneu App)",
+                        "expiry": "",
+                        "promotionSavings": 1450.0,
+                        "termsAndConditions": []
+                    }
+                ],
+                "couponOffers": []
+            }
+        }
+    }
 }
 
-response = requests.get(url, headers=headers)
-print("Status Code:", response.status_code)
-print("Response:")
-print(response.text)
+def extract_promotions(data):
+    benefits = data.get('data', {}).get('bestBenefitValue', {})
+    results = []
+
+    for section in ['exchangeBenefit', 'nonExchangeBenefit']:
+        benefit = benefits.get(section, {})
+        for offer in benefit.get('productTransactionOffers', []):
+            results.append({
+                "section": section,
+                "title": offer.get("offerTitle"),
+                "description": offer.get("offerDescription"),
+                "savings": offer.get("promotionSavings"),
+                "type": offer.get("offerType"),
+                "promotionId": offer.get("promotionId")
+            })
+    return results
+
+promotions = extract_promotions(response_data)
+
+for promo in promotions:
+    print(f"Section: {promo['section']}")
+    print(f"Title: {promo['title']}")
+    print(f"Description: {promo['description']}")
+    print(f"Savings: Rs.{promo['savings']}")
+    print(f"Type: {promo['type']}")
+    print(f"Promotion ID: {promo['promotionId']}")
+    print("-" * 40)
