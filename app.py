@@ -57,15 +57,14 @@ def fetch_price(product_id):
         return data["pricelist"][0]
     return None
 
-def fetch_promotion_offer(product_id):
-    url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
+def fetch_offer_detail(product_id):
+    url = "https://api.croma.com/offer/allchannels/v2/detail"
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-encoding": "gzip, deflate, br, zstd",
         "accept-language": "en-US,en;q=0.9",
-        "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",  # Naya value dalte raho jab expire ho
-        "client_id": "CROMA",
-        "content-type": "application/x-www-form-urlencoded",
+        "client_id": "CROMA-WEB-APP",
+        "content-type": "application/json",
         "origin": "https://www.croma.com",
         "referer": "https://www.croma.com/",
         "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
@@ -73,36 +72,45 @@ def fetch_promotion_offer(product_id):
         "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
-        "sec-fetch-site": "cross-site",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        # Cookie value yahan naya dalte raho jab expire ho
-        "cookie": "ak_bmsc=AE4197997A9986F526AE2DCDD3BFD70D~000000000000000000000000000000~YAAQHXBWuMLIPL6YAQAAJZlhwxwToTq9dbKuLgtD+Ke8DzILOnWHD7t25NHHpWXqDOSdCHhHvJLYUCIsa+W83hmk3fayaMOWmWETM5fAciBGEcOWmhooOAA/axlDWYCMyeW0mEPQvCBOZ7Lko6L/+IoJxbEoYYVX9nWhy2QxLClzaMdH7/q9zqSk2LpOpQvnRVRRu9N1u7RE5U/nFxkazQPfsodWDWXdINuUDjrICnRo5ripO4IXILOm0A+r+X49GLop9mQVZXVTgMBaSTSBZbKAREFUwoqlzpwGOM49W78rBwp6BomKIShFyZrVyg3E8uFhYXKn2iSMVbNSAMbkMEmbYn+quQD4A7fHrCJaqDd40q5g+Nwod3GcrSXmrjFylItIlvDUOUhUJ0hNoYF/QZk=; bm_sz=1EB8C2BEAADD7D5896BFF46C9E3DAB6A~YAAQHXBWuMPIPL6YAQAAJZlhwxyxFRGVCs9SJShxCE2bFPGVRSeDDTxvZwI24IoXvCRn2MLi5cIpLopYMnWz9Gs/ITEdJP1+4H+8IAPhTlo9fwN+R5ZarQ6NXvg0zoMl24p7rDj+4oBllZdusK3vPi4wKIlgdyoy0YDelCX9ElHf1fYHx5P+50wwd2B9LTJjI+7g58K/qfAf1KoDZuCl8L5rzkSQB3K8HLcWwty2GbmPtBQPZ+FpcQdwmdZe5IZJVE2nPTi/SL/BZmQaj5latnMjMLVdAoyIqYgTA0z3r+f4IXMzjXuv4A8ydetg5zzfFucW0no4gitEarewqBunk5y/BiQSjUCf4MQl7538gjULXyJaKNo2Sk2y1A==~3223603~3158853"
+        "sec-fetch-site": "same-site",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+        # Cookie only if you get a 403 error
+        # "cookie": "bm_sz=..."
     }
     payload = {
-        "skuId": product_id
+        "skuId": product_id,
+        "channel": "EC",
+        "storeId": "",
+        "pincode": ""
     }
     try:
-        r = requests.post(url, headers=headers, data=payload)
+        r = requests.post(url, headers=headers, json=payload)
         r.raise_for_status()
         data = r.json()
         offers = []
-        offer_list = (
-            data.get("getApplicablePromotionsForItemResponse", {})
-            .get("offerDetailsList", [])
-        )
-        for offer in offer_list:
-            title = offer.get("offerTitle", "")
-            desc = offer.get("description", "")
-            match = re.search(r'Rs\.?\s?([0-9]+)', title)
-            saving = float(match.group(1)) if match else 0
+        # Check for offerText at root level
+        offer_text = data.get("offerText", "")
+        match = re.search(r'Rs\.?(\d+)', offer_text)
+        saving = int(match.group(1)) if match else 0
+        if offer_text:
             offers.append({
-                "title": title,
-                "desc": desc,
+                "title": offer_text,
+                "desc": "",
                 "saving": saving
             })
+        # Also check groupedProductOfferDetails for more offers
+        grouped = data.get("groupedProductOfferDetails", {})
+        for item in grouped.get("triggerProductsData", []):
+            # Sometimes discount field is present here
+            if "discount" in item and item["discount"]:
+                offers.append({
+                    "title": f"Direct Discount: ₹{item['discount']}",
+                    "desc": "",
+                    "saving": float(item["discount"])
+                })
         return offers
     except Exception as e:
-        print(f"Promotion fetch error: {e}")
+        print(f"Offer fetch error: {e}")
         return []
 
 def check_prices():
@@ -120,18 +128,21 @@ def check_prices():
             p["last_checked"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             p["last_price"] = selling
 
-            promotions = fetch_promotion_offer(p["id"])
+            # --- Offer Detail Fetch ---
+            offers = fetch_offer_detail(p["id"])
             promo_text = ""
             promo_alert = False
             target_promotion = p.get("target_promotion")
-            if promotions:
-                for promo in promotions:
+            if offers:
+                for promo in offers:
                     promo_text += f"\nOffer: {promo['title']} | Save: ₹{promo['saving']}"
+                    # Promotion alert: if any offer saving >= target_promotion
                     if target_promotion and float(promo["saving"]) >= float(target_promotion):
                         promo_alert = True
 
             print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}{promo_text}")
 
+            # Alert condition: selling price <= target OR promo saving >= target_promotion
             if (
                 (p.get("target_price") and float(selling) <= float(p["target_price"]))
                 or promo_alert
@@ -183,10 +194,11 @@ def index():
     </tr>
     """
     for p in products:
-        promotions = fetch_promotion_offer(p["id"])
+        # Fetch offer details for display in UI
+        offers = fetch_offer_detail(p["id"])
         promo_html = ""
-        if promotions:
-            for promo in promotions:
+        if offers:
+            for promo in offers:
                 promo_html += f"<div><b>{promo['title']}</b> <span style='color:green'>(Save: ₹{promo['saving']})</span></div>"
         html += f"""
         <tr>
