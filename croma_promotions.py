@@ -1,38 +1,42 @@
-from playwright.sync_api import sync_playwright
+import requests
 
-PRODUCT_URL = "https://www.croma.com/vivo-v30-5g-12gb-ram-256gb-rom-peacock-green/p/312576"
+API_URL = "https://api.tatadigital.com/api/v1/commerce/benefit-offers"
+params = {
+    "skuId": "312576",
+    "category": "electronics",
+    "pinCode": "400001",
+    "categoryId": "10"
+}
 
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9",
+    "client_id": "TCP-WEB-APP",
+    "client_secret": "6fe27bd7-658d-4d28-ab66-a71da9637529",
+    "content-type": "application/json",
+    "origin": "https://www.tataneu.com",
+    "referer": "https://www.tataneu.com/",
+    "neu-app-version": "6.1.0",
+    # Add any other required headers here, like cookies, session IDs, etc.
+}
 
-        # Print every XHR request URL for debugging
-        def handle_response(response):
-            if response.request.resource_type == "xhr":
-                print(f"XHR: {response.url}")
-        page.on("response", handle_response)
-
-        print(f"Opening: {PRODUCT_URL}")
-        page.goto(PRODUCT_URL, timeout=60000)
-
-        # Scroll the page
-        page.mouse.wheel(0, 3000)
-        page.wait_for_timeout(2000)
-
-        # Try all possible offer button texts
-        for text in ["View All Offers", "Show More Offers", "BANK OFFER", "MIDNIGHT DEALS", "Offers"]:
-            try:
-                page.click(f"text='{text}'")
-                print(f"Clicked on: {text}")
-                page.wait_for_timeout(2000)
-            except Exception as e:
-                print(f"No '{text}' button: {e}")
-
-        page.wait_for_timeout(30000)  # Wait longer for all XHRs
-
-        browser.close()
-
-if __name__ == "__main__":
-    main()
+response = requests.get(API_URL, params=params, headers=headers)
+if response.status_code == 200:
+    try:
+        data = response.json()
+        print("Promotions Response:")
+        print(data)
+        # Agar aapko specific fields chahiye:
+        # Example: print all offer titles
+        if "offers" in data:
+            for offer in data["offers"]:
+                print("Offer Title:", offer.get("offerTitle"))
+                print("Description:", offer.get("description"))
+                print("-" * 40)
+    except Exception as e:
+        print("Error parsing JSON:", e)
+        print("Raw response:", response.text)
+else:
+    print("API Error:", response.status_code, response.text)
