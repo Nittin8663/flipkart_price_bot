@@ -1,32 +1,49 @@
-from playwright.sync_api import sync_playwright
+import requests
 
-PRODUCT_URL = "https://www.croma.com/vivo-v30-5g-12gb-ram-256gb-rom-peacock-green/p/312576"
+url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
 
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+payload = {
+    "getApplicablePromotionsForItemRequest": {
+        "itemId": "312576",  # Product ID
+        "programId": "01eae2ec-0576-1000-bbea-86e16dcb4b79",
+        "channelIds": ["TCPCHS0003"],
+        "status": "ACTIVE",
+        "customerHash": "1ca343547f343c432b0c3dbb7ab2c4c9"
+    }
+}
 
-        # Print every XHR request URL for debugging
-        def handle_response(response):
-            if response.request.resource_type == "xhr":
-                print(f"XHR: {response.url}")
+headers = {
+    "accept": "application/json, text/plain, */*",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9",
+    "authorization": "Bearer e55236f3-a403-4c77-912a-13c53b4a0e28",
+    "client_id": "CROMA-WEB-APP",
+    "content-type": "application/x-www-form-urlencoded",
+    "origin": "https://www.croma.com",
+    "referer": "https://www.croma.com/",
+    "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    # Add cookies if needed, e.g.:
+    # "cookie": "ak_bmsc=...; bm_sz=..."
+}
 
-        page.on("response", handle_response)
+# For application/x-www-form-urlencoded, send as key=value string
+import json
+data = f"getApplicablePromotionsForItemRequest={json.dumps(payload['getApplicablePromotionsForItemRequest'])}"
 
-        print(f"Opening: {PRODUCT_URL}")
-        page.goto(PRODUCT_URL, timeout=60000)
-
-        # Try clicking any offer-related button
-        try:
-            page.click("text='View All Offers'")
-        except Exception as e:
-            print(f"No 'View All Offers' button: {e}")
-
-        page.wait_for_timeout(20000)
-
-        browser.close()
-
-if __name__ == "__main__":
-    main()
+response = requests.post(url, headers=headers, data=data)
+print("Status code:", response.status_code)
+print("Response:")
+try:
+    promotions = response.json()
+    for offer in promotions.get("getApplicablePromotionsForItemResponse", {}).get("offerDetailsList", []):
+        print(f"Title: {offer['offerTitle']}")
+        print(f"Desc: {offer['description']}")
+        print(f"Type: {offer['benefitType']}")
+        print(f"Start: {offer['offerStartDate']}  End: {offer['expiryDate']}")
+        print("-" * 40)
+except Exception as e:
+    print("Failed to parse JSON:", e)
+    print(response.text)
