@@ -7,7 +7,7 @@ import time
 import os
 
 # --- CONFIG ---
-with open("telegram.json") as f:
+with open("config.json") as f:
     CONFIG = json.load(f)
 
 BOT_TOKEN = CONFIG["TELEGRAM_BOT_TOKEN"]
