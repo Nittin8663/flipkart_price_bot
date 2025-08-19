@@ -1,21 +1,24 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-import time
+from playwright.sync_api import sync_playwright
 
 PRODUCT_URL = "https://www.croma.com/vivo-v30-5g-12gb-ram-256gb-rom-peacock-green/p/312576"
+OFFER_API_ENDPOINT = "/offer/allchannels/v2/detail"
 
-driver = webdriver.Chrome()
-driver.get(PRODUCT_URL)
-time.sleep(5)  # Wait for the page/XHRs to load
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=False)
+    context = browser.new_context()
+    page = context.new_page()
 
-# Find visible offer/promotion sections (adjust selector as per Croma site update)
-try:
-    offer_elems = driver.find_elements(By.CSS_SELECTOR, ".offers-sec, .offers-section, .offerText, .offer-details")
-    if not offer_elems:
-        offer_elems = driver.find_elements(By.XPATH, "//div[contains(text(),'Offer') or contains(text(),'Promotion')]")
-    for elem in offer_elems:
-        print(elem.text)
-except Exception as e:
-    print("Error extracting offers:", e)
+    def handle_response(response):
+        if OFFER_API_ENDPOINT in response.url:
+            print(f"XHR URL: {response.url}")
+            try:
+                print("XHR response:", response.json())
+            except Exception:
+                print("Non-JSON response:", response.text())
 
-driver.quit()
+    page.on("response", handle_response)
+
+    page.goto(PRODUCT_URL)
+    page.wait_for_timeout(8000)  # Wait for XHRs
+
+    browser.close()
