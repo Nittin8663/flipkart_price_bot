@@ -12,19 +12,23 @@ def main():
         def handle_response(response):
             if response.request.resource_type == "xhr":
                 print(f"XHR: {response.url}")
-
         page.on("response", handle_response)
 
         print(f"Opening: {PRODUCT_URL}")
         page.goto(PRODUCT_URL, timeout=60000)
 
-        # Scroll & click to trigger more offers
-        page.mouse.wheel(0, 2000)
+        # Scroll the page
+        page.mouse.wheel(0, 3000)
         page.wait_for_timeout(2000)
-        try:
-            page.click("text='View All Offers'")
-        except Exception as e:
-            print(f"No 'View All Offers' button: {e}")
+
+        # Try all possible offer button texts
+        for text in ["View All Offers", "Show More Offers", "BANK OFFER", "MIDNIGHT DEALS", "Offers"]:
+            try:
+                page.click(f"text='{text}'")
+                print(f"Clicked on: {text}")
+                page.wait_for_timeout(2000)
+            except Exception as e:
+                print(f"No '{text}' button: {e}")
 
         page.wait_for_timeout(30000)  # Wait longer for all XHRs
 
