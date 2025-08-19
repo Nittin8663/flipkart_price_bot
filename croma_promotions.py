@@ -13,9 +13,18 @@ def main():
             if OFFER_XHR_SUBSTRING in response.url:
                 print(f"\n--- Found Offer API XHR ---\nXHR URL: {response.url}")
                 try:
-                    print("XHR response:", response.json())
+                    data = response.json()
                 except Exception:
                     print("Non-JSON response:", response.text())
+                    return
+
+                offers = data.get("getApplicablePromotionsForItemResponse", {}).get("offerDetailsList", [])
+                for offer in offers:
+                    print("Offer Title:", offer.get("offerTitle"))
+                    print("Description:", offer.get("description"))
+                    print("Type:", offer.get("benefitType"))
+                    print("Start:", offer.get("offerStartDate"), "End:", offer.get("expiryDate"))
+                    print("-" * 50)
 
         page.on("response", handle_response)
         print(f"Opening: {PRODUCT_URL}")
