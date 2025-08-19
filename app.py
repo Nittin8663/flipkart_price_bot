@@ -19,7 +19,6 @@ PRODUCTS_FILE = "products.json"
 
 app = Flask(__name__)
 
-# --- HELPERS ---
 def load_products():
     if not os.path.exists(PRODUCTS_FILE):
         return []
@@ -64,7 +63,7 @@ def fetch_promotion_offer(product_id):
         "accept": "application/json, text/plain, */*",
         "accept-encoding": "gzip, deflate, br, zstd",
         "accept-language": "en-US,en;q=0.9",
-        "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",  # Update this from browser if needed!
+        "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",  # Naya value dalte raho jab expire ho
         "client_id": "CROMA",
         "content-type": "application/x-www-form-urlencoded",
         "origin": "https://www.croma.com",
@@ -76,7 +75,8 @@ def fetch_promotion_offer(product_id):
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "cross-site",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        "cookie": "ak_bmsc=D3FBA7D2F179FB9DE84082AB495D7AA8~000000000000000000000000000000~YAAQHXBWuAanOr6YAQAAa1VUwxxMeBXNtaBQQjhwqY3XefAres/8H07NLYhTaYb/tB6Xkmd1vaVgJU8m0jbB6vF63NjwJW7qoS2IIy27Fs+0suiG2I9PbSYgmvhkyGYxk8UcpRGJus9ZvZV7CWWqDTLA+q5RCDknE+6YGt/oSREGf675FFUOn99pzb/CxoBaf1p0sVuOw4ATAZb9ICb6R2O9GlCVSsCtuxUXb+AL0vxEQrBVOXs0ngO42cOnzS05yH7IAQaZgHAjFUR/rAs6EJpfFXEynu0ENuVaMGq4ObcOOOOu6dFcly6+4hR/UDbXcooGRa57PlVxshKLCc8DdowbpsqPlDBsyELai40G0Vs9GKvytCzcmbA3FFp+kIQ3zorIQzqr1eNfrqLulGU34H8=; bm_sz=C7D388EDE03159AF14D145FBD3A8433C~YAAQHXBWuAenOr6YAQAAa1VUwxw1ywp/RA4JPehBTRHBG1kUDpXuqdHndtq5u67BOmreZpkyd7cSHtme+vBvlpu3tu9CBp1xSYGJZqgblmxigdI0od805KRBLsE/gNObMgLo8w5aaI526GAZd2fD+vPwI35w+W3ZE87u/1pbDi++yTLJc6oP+z6A696iW0M+4Cn08Uiqy3Od/m2cTvHb+4WFaOjk8BxWPqi8MCkIcXxhno+BxVhfEGH7mLncXkC/0aC9VqRQagBFeVnXN7sYOjepKv+CzEnia92HDo3JInoWxM7zGsW14KUNXipS98Rq995l7PiX+ccgUGVuOxiqpOnGys9SgCEINE8C/Rxs+oM3M/4lMHIVWnms0w==~4342337~4404018"
+        # Cookie value yahan naya dalte raho jab expire ho
+        "cookie": "ak_bmsc=AE4197997A9986F526AE2DCDD3BFD70D~000000000000000000000000000000~YAAQHXBWuMLIPL6YAQAAJZlhwxwToTq9dbKuLgtD+Ke8DzILOnWHD7t25NHHpWXqDOSdCHhHvJLYUCIsa+W83hmk3fayaMOWmWETM5fAciBGEcOWmhooOAA/axlDWYCMyeW0mEPQvCBOZ7Lko6L/+IoJxbEoYYVX9nWhy2QxLClzaMdH7/q9zqSk2LpOpQvnRVRRu9N1u7RE5U/nFxkazQPfsodWDWXdINuUDjrICnRo5ripO4IXILOm0A+r+X49GLop9mQVZXVTgMBaSTSBZbKAREFUwoqlzpwGOM49W78rBwp6BomKIShFyZrVyg3E8uFhYXKn2iSMVbNSAMbkMEmbYn+quQD4A7fHrCJaqDd40q5g+Nwod3GcrSXmrjFylItIlvDUOUhUJ0hNoYF/QZk=; bm_sz=1EB8C2BEAADD7D5896BFF46C9E3DAB6A~YAAQHXBWuMPIPL6YAQAAJZlhwxyxFRGVCs9SJShxCE2bFPGVRSeDDTxvZwI24IoXvCRn2MLi5cIpLopYMnWz9Gs/ITEdJP1+4H+8IAPhTlo9fwN+R5ZarQ6NXvg0zoMl24p7rDj+4oBllZdusK3vPi4wKIlgdyoy0YDelCX9ElHf1fYHx5P+50wwd2B9LTJjI+7g58K/qfAf1KoDZuCl8L5rzkSQB3K8HLcWwty2GbmPtBQPZ+FpcQdwmdZe5IZJVE2nPTi/SL/BZmQaj5latnMjMLVdAoyIqYgTA0z3r+f4IXMzjXuv4A8ydetg5zzfFucW0no4gitEarewqBunk5y/BiQSjUCf4MQl7538gjULXyJaKNo2Sk2y1A==~3223603~3158853"
     }
     payload = {
         "skuId": product_id
@@ -120,7 +120,6 @@ def check_prices():
             p["last_checked"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             p["last_price"] = selling
 
-            # --- Promotion Offer Fetch ---
             promotions = fetch_promotion_offer(p["id"])
             promo_text = ""
             promo_alert = False
@@ -128,13 +127,11 @@ def check_prices():
             if promotions:
                 for promo in promotions:
                     promo_text += f"\nOffer: {promo['title']} | Save: ₹{promo['saving']}"
-                    # Promotion alert: if any offer saving >= target_promotion
                     if target_promotion and float(promo["saving"]) >= float(target_promotion):
                         promo_alert = True
 
             print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}{promo_text}")
 
-            # Alert condition: selling price <= target OR promo saving >= target_promotion
             if (
                 (p.get("target_price") and float(selling) <= float(p["target_price"]))
                 or promo_alert
@@ -152,7 +149,6 @@ def background_checker():
         check_prices()
         time.sleep(CHECK_INTERVAL)
 
-# --- ROUTES ---
 @app.route("/")
 def index():
     products = load_products()
@@ -187,7 +183,6 @@ def index():
     </tr>
     """
     for p in products:
-        # Fetch promotion offers for display in UI
         promotions = fetch_promotion_offer(p["id"])
         promo_html = ""
         if promotions:
