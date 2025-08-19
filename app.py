@@ -62,14 +62,27 @@ def fetch_promotion_offer(product_id):
     url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
     headers = {
         "accept": "application/json, text/plain, */*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "en-US,en;q=0.9",
+        "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",  # Update this from browser if needed!
+        "client_id": "CROMA",
+        "content-type": "application/x-www-form-urlencoded",
         "origin": "https://www.croma.com",
         "referer": "https://www.croma.com/",
+        "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        "content-type": "application/json"
+        "cookie": "ak_bmsc=D3FBA7D2F179FB9DE84082AB495D7AA8~000000000000000000000000000000~YAAQHXBWuAanOr6YAQAAa1VUwxxMeBXNtaBQQjhwqY3XefAres/8H07NLYhTaYb/tB6Xkmd1vaVgJU8m0jbB6vF63NjwJW7qoS2IIy27Fs+0suiG2I9PbSYgmvhkyGYxk8UcpRGJus9ZvZV7CWWqDTLA+q5RCDknE+6YGt/oSREGf675FFUOn99pzb/CxoBaf1p0sVuOw4ATAZb9ICb6R2O9GlCVSsCtuxUXb+AL0vxEQrBVOXs0ngO42cOnzS05yH7IAQaZgHAjFUR/rAs6EJpfFXEynu0ENuVaMGq4ObcOOOOu6dFcly6+4hR/UDbXcooGRa57PlVxshKLCc8DdowbpsqPlDBsyELai40G0Vs9GKvytCzcmbA3FFp+kIQ3zorIQzqr1eNfrqLulGU34H8=; bm_sz=C7D388EDE03159AF14D145FBD3A8433C~YAAQHXBWuAenOr6YAQAAa1VUwxw1ywp/RA4JPehBTRHBG1kUDpXuqdHndtq5u67BOmreZpkyd7cSHtme+vBvlpu3tu9CBp1xSYGJZqgblmxigdI0od805KRBLsE/gNObMgLo8w5aaI526GAZd2fD+vPwI35w+W3ZE87u/1pbDi++yTLJc6oP+z6A696iW0M+4Cn08Uiqy3Od/m2cTvHb+4WFaOjk8BxWPqi8MCkIcXxhno+BxVhfEGH7mLncXkC/0aC9VqRQagBFeVnXN7sYOjepKv+CzEnia92HDo3JInoWxM7zGsW14KUNXipS98Rq995l7PiX+ccgUGVuOxiqpOnGys9SgCEINE8C/Rxs+oM3M/4lMHIVWnms0w==~4342337~4404018"
     }
-    payload = {"skuId": product_id}
+    payload = {
+        "skuId": product_id
+    }
     try:
-        r = requests.post(url, headers=headers, json=payload)
+        r = requests.post(url, headers=headers, data=payload)
         r.raise_for_status()
         data = r.json()
         offers = []
@@ -80,7 +93,6 @@ def fetch_promotion_offer(product_id):
         for offer in offer_list:
             title = offer.get("offerTitle", "")
             desc = offer.get("description", "")
-            # Find Rs.XXXX off
             match = re.search(r'Rs\.?\s?([0-9]+)', title)
             saving = float(match.group(1)) if match else 0
             offers.append({
