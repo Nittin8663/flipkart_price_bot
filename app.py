@@ -1,23 +1,25 @@
 import json
 import requests
-import re
 from flask import Flask, request, redirect, url_for
 from threading import Thread
 from datetime import datetime
 import time
 import os
 
-# --- CONFIG ---
+# Load config
 with open("config.json") as f:
     CONFIG = json.load(f)
 
 BOT_TOKEN = CONFIG["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = CONFIG["TELEGRAM_CHAT_ID"]
-CHECK_INTERVAL = CONFIG.get("CHECK_INTERVAL", 600)
+CHECK_INTERVAL = CONFIG["CHECK_INTERVAL"]
 
+# File for products
 PRODUCTS_FILE = "products.json"
 
 app = Flask(__name__)
+
+# ------------------ Helpers ------------------
 
 def load_products():
     if not os.path.exists(PRODUCTS_FILE):
@@ -57,62 +59,6 @@ def fetch_price(product_id):
         return data["pricelist"][0]
     return None
 
-def fetch_offer_detail(product_id):
-    url = "https://api.croma.com/offer/allchannels/v2/detail"
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "accept-encoding": "gzip, deflate, br, zstd",
-        "accept-language": "en-US,en;q=0.9",
-        "client_id": "CROMA-WEB-APP",
-        "content-type": "application/json",
-        "origin": "https://www.croma.com",
-        "referer": "https://www.croma.com/",
-        "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-        # Cookie only if you get a 403 error
-        # "cookie": "bm_sz=..."
-    }
-    payload = {
-        "skuId": product_id,
-        "channel": "EC",
-        "storeId": "",
-        "pincode": ""
-    }
-    try:
-        r = requests.post(url, headers=headers, json=payload)
-        r.raise_for_status()
-        data = r.json()
-        offers = []
-        # Check for offerText at root level
-        offer_text = data.get("offerText", "")
-        match = re.search(r'Rs\.?(\d+)', offer_text)
-        saving = int(match.group(1)) if match else 0
-        if offer_text:
-            offers.append({
-                "title": offer_text,
-                "desc": "",
-                "saving": saving
-            })
-        # Also check groupedProductOfferDetails for more offers
-        grouped = data.get("groupedProductOfferDetails", {})
-        for item in grouped.get("triggerProductsData", []):
-            # Sometimes discount field is present here
-            if "discount" in item and item["discount"]:
-                offers.append({
-                    "title": f"Direct Discount: ₹{item['discount']}",
-                    "desc": "",
-                    "saving": float(item["discount"])
-                })
-        return offers
-    except Exception as e:
-        print(f"Offer fetch error: {e}")
-        return []
-
 def check_prices():
     products = load_products()
     for p in products:
@@ -128,27 +74,11 @@ def check_prices():
             p["last_checked"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             p["last_price"] = selling
 
-            # --- Offer Detail Fetch ---
-            offers = fetch_offer_detail(p["id"])
-            promo_text = ""
-            promo_alert = False
-            target_promotion = p.get("target_promotion")
-            if offers:
-                for promo in offers:
-                    promo_text += f"\nOffer: {promo['title']} | Save: ₹{promo['saving']}"
-                    # Promotion alert: if any offer saving >= target_promotion
-                    if target_promotion and float(promo["saving"]) >= float(target_promotion):
-                        promo_alert = True
+            print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}")
 
-            print(f"{p['name']}: MRP {mrp} | Selling {selling} | Discount {discount}{promo_text}")
-
-            # Alert condition: selling price <= target OR promo saving >= target_promotion
-            if (
-                (p.get("target_price") and float(selling) <= float(p["target_price"]))
-                or promo_alert
-            ):
+            if p.get("target_price") and float(selling) <= float(p["target_price"]):
                 send_telegram_message(
-                    f"Price/Offer Alert!\n{p['name']}\nMRP: {mrp}\nPrice: ₹{selling}\nDiscount: {discount}{promo_text}"
+                    f"Price Drop Alert!\n{p['name']}\nMRP: {mrp}\nPrice: ₹{selling}\nDiscount: {discount}"
                 )
 
         except Exception as e:
@@ -159,6 +89,8 @@ def background_checker():
     while True:
         check_prices()
         time.sleep(CHECK_INTERVAL)
+
+# ------------------ Routes ------------------
 
 @app.route("/")
 def index():
@@ -186,7 +118,6 @@ def index():
     <tr>
         <th>Name</th>
         <th>Target Price</th>
-        <th>Target Promotion</th>
         <th>Last Price</th>
         <th>Last Checked</th>
         <th>Status</th>
@@ -194,17 +125,10 @@ def index():
     </tr>
     """
     for p in products:
-        # Fetch offer details for display in UI
-        offers = fetch_offer_detail(p["id"])
-        promo_html = ""
-        if offers:
-            for promo in offers:
-                promo_html += f"<div><b>{promo['title']}</b> <span style='color:green'>(Save: ₹{promo['saving']})</span></div>"
         html += f"""
         <tr>
-            <td>{p['name']}<br>{promo_html}</td>
+            <td>{p['name']}</td>
             <td>{p.get('target_price', '')}</td>
-            <td>{p.get('target_promotion', '')}</td>
             <td>{p.get('last_price', '')}</td>
             <td>{p.get('last_checked', '')}</td>
             <td>{"Enabled" if p.get('enabled', True) else "Disabled"}</td>
@@ -227,7 +151,6 @@ def edit_product(product_id):
 
     if request.method == "POST":
         product["target_price"] = float(request.form["target_price"])
-        product["target_promotion"] = float(request.form["target_promotion"])
         save_products(products)
         Thread(target=check_prices).start()
         return redirect(url_for("index"))
@@ -236,8 +159,7 @@ def edit_product(product_id):
     <html><body>
     <h1>Edit {product['name']}</h1>
     <form method='POST'>
-        Target Price: <input type='number' step='0.01' name='target_price' value='{product.get("target_price", "")}' required><br><br>
-        Target Promotion (save amount): <input type='number' step='0.01' name='target_promotion' value='{product.get("target_promotion", "")}' required><br><br>
+        Target Price: <input type='number' step='0.01' name='target_price' value='{product.get("target_price", "")}' required>
         <input type='submit' value='Save'>
     </form>
     </body></html>
@@ -266,7 +188,6 @@ def add_product():
             "id": request.form["id"],
             "name": request.form["name"],
             "target_price": float(request.form["target_price"]),
-            "target_promotion": float(request.form["target_promotion"]),
             "enabled": True
         }
         products.append(new_product)
@@ -279,11 +200,12 @@ def add_product():
         Product ID: <input type='text' name='id' required><br><br>
         Name: <input type='text' name='name' required><br><br>
         Target Price: <input type='number' step='0.01' name='target_price' required><br><br>
-        Target Promotion (save amount): <input type='number' step='0.01' name='target_promotion' required><br><br>
         <input type='submit' value='Add Product'>
     </form>
     </body></html>
     """
+
+# ------------------ Start ------------------
 
 if __name__ == "__main__":
     Thread(target=background_checker, daemon=True).start()
