@@ -1,6 +1,10 @@
-import requests
+from playwright.sync_api import sync_playwright
 
-url = "https://api.croma.com/pricing-services/v1/price?productList=312576"
+proxy = {
+    "server": "http://74.81.81.81:823",
+    "username": "1258bd9e03f80533eb38__cr.in",
+    "password": "ca69cf1263c65d0e",
+}
 
 headers = {
     "accept": "application/json, text/plain, */*",
@@ -18,15 +22,18 @@ headers = {
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 }
 
-cookies = {
-    "bm_sz": "D4EE8A6BE999499542A67F183BE205C0~YAAQVHBWuFunkLCYAQAADfqTxhwI03dyq4TJOmAGnbciyWUd09tnBudoBilB4nOcMbcDaCFAwj3Af38iMfCmQLFdxH7aGMg7EgCVfNx1KGe1qPSDMP1M862BvRejKNfOiCgTwrUzdlR8+LXx92+DGOEerpsaTOqPEXihn2jpUuzQXfJS2K4WV4Zm4UbPws326d2JKhK8+T7yOG15SAho18UdF5aUoX0hUlAgsKzxgRAbwZFwqzF7U5tOKbYFqbm/yaUKg0W4n/Kxm7Vc0FVHSuzch/0uOXAs5QNpqUuasiAqq7wCu7HtWGZv/WWl0UqcCDHt9VZc3gK+4AAo2GClw25bgYS8DQUVRrvCgKiqBTU97pKDTMMWfPjDxV+DDqlBSJCSmYdrgdbOf9oe+lgzZA==~4273719~3618102"
+cookie = {
+    "name": "bm_sz",
+    "value": "D4EE8A6BE999499542A67F183BE205C0~YAAQVHBWuFunkLCYAQAADfqTxhwI03dyq4TJOmAGnbciyWUd09tnBudoBilB4nOcMbcDaCFAwj3Af38iMfCmQLFdxH7aGMg7EgCVfNx1KGe1qPSDMP1M862BvRejKNfOiCgTwrUzdlR8+LXx92+DGOEerpsaTOqPEXihn2jpUuzQXfJS2K4WV4Zm4UbPws326d2JKhK8+T7yOG15SAho18UdF5aUoX0hUlAgsKzxgRAbwZFwqzF7U5tOKbYFqbm/yaUKg0W4n/Kxm7Vc0FVHSuzch/0uOXAs5QNpqUuasiAqq7wCu7HtWGZv/WWl0UqcCDHt9VZc3gK+4AAo2GClw25bgYS8DQUVRrvCgKiqBTU97pKDTMMWfPjDxV+DDqlBSJCSmYdrgdbOf9oe+lgzZA==~4273719~3618102",
+    "domain": ".croma.com",
+    "path": "/"
 }
 
-proxies = {
-    "http": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@74.81.81.81:823",
-    "https": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@74.81.81.81:823",
-}
-
-r = requests.get(url, headers=headers, cookies=cookies, proxies=proxies, timeout=20)
-print(r.status_code)
-print(r.text)
+with sync_playwright() as p:
+    browser = p.chromium.launch(proxy=proxy, headless=True)
+    context = browser.new_context(extra_http_headers=headers)
+    context.add_cookies([cookie])
+    page = context.new_page()
+    page.goto("https://api.croma.com/pricing-services/v1/price?productList=312576", timeout=25000)
+    print(page.content())
+    browser.close()
