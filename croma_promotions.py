@@ -1,17 +1,29 @@
-import requests
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+import time
 
-url = "https://www.croma.com/"
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-}
+options = uc.ChromeOptions()
+# options.add_argument("--headless")  # Headless off for less detection
+options.add_argument("--window-size=1280,800")
+options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
 
+driver = uc.Chrome(options=options)
+driver.get("https://www.croma.com/vivo-y29-5g-6gb-ram-128gb-glacier-blue-/p/312576")
+
+# Simulate human actions
+actions = ActionChains(driver)
+actions.move_by_offset(100, 100).perform()
+time.sleep(2)
+driver.execute_script("window.scrollTo(0, 200);")
+time.sleep(2)
+
+print("Title:", driver.title)
+# Find price or other elements as needed
 try:
-    r = requests.get(url, headers=headers, timeout=15)
-    print("Status code:", r.status_code)
-    print("First 200 chars of response:\n", r.text[:200])
-    if "Access Denied" in r.text or "blocked" in r.text.lower():
-        print("⚠️ IP possibly blocked or bot detected!")
-    else:
-        print("✅ IP not blocked, content looks normal.")
-except Exception as e:
-    print("Error:", e)
+    price_elem = driver.find_element(By.XPATH, "//span[contains(@class,'amount')]")
+    print("Price:", price_elem.text)
+except Exception as ex:
+    print("Price not found:", ex)
+
+driver.quit()
