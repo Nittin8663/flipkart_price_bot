@@ -1,16 +1,14 @@
-from playwright.sync_api import sync_playwright
+import requests
 
-proxy = {
-    "server": "http://74.81.81.81:823",
-    "username": "1258bd9e03f80533eb38__cr.in",
-    "password": "ca69cf1263c65d0e",
-}
+url = "https://api.tatadigital.com/getApplicablePromotion/getApplicationPromotionsForItemOffer"
 
 headers = {
     "accept": "application/json, text/plain, */*",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "en-US,en;q=0.9,hi;q=0.8,de;q=0.7",
-    "channel": "EC",
+    "authorization": "8Tksadcs85ad4vsasfasgf4sJHvfs4NiKNKLHKLH582546f646",
+    "client_id": "CROMA",
+    "content-type": "application/json",
     "origin": "https://www.croma.com",
     "referer": "https://www.croma.com/",
     "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
@@ -18,22 +16,24 @@ headers = {
     "sec-ch-ua-platform": '"macOS"',
     "sec-fetch-dest": "empty",
     "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
+    "sec-fetch-site": "cross-site",
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 }
 
-cookie = {
-    "name": "bm_sz",
-    "value": "D4EE8A6BE999499542A67F183BE205C0~YAAQVHBWuFunkLCYAQAADfqTxhwI03dyq4TJOmAGnbciyWUd09tnBudoBilB4nOcMbcDaCFAwj3Af38iMfCmQLFdxH7aGMg7EgCVfNx1KGe1qPSDMP1M862BvRejKNfOiCgTwrUzdlR8+LXx92+DGOEerpsaTOqPEXihn2jpUuzQXfJS2K4WV4Zm4UbPws326d2JKhK8+T7yOG15SAho18UdF5aUoX0hUlAgsKzxgRAbwZFwqzF7U5tOKbYFqbm/yaUKg0W4n/Kxm7Vc0FVHSuzch/0uOXAs5QNpqUuasiAqq7wCu7HtWGZv/WWl0UqcCDHt9VZc3gK+4AAo2GClw25bgYS8DQUVRrvCgKiqBTU97pKDTMMWfPjDxV+DDqlBSJCSmYdrgdbOf9oe+lgzZA==~4273719~3618102",
-    "domain": ".croma.com",
-    "path": "/"
+cookies = {
+    "ak_bmsc": "0569BC54337442B34C7247033EFAEA11~000000000000000000000000000000~YAAQnGnDF5lIiLSYAQAAhG/Evhz9BluBJhq5SCDwQFOvKHAtsg37TKl8gFNoErBvSQSwd3Fx2R1dmzmk2T9SZCmdGA47t9RsJo/iRn8etl0tdF/oy33snlPTisxwB5Dh5vxDHYBM410SyWTYmp2ZmDwl6TZBVvQIaAMO/uv4mS0mzFMHnSBbT2eQB6SSV7evRNkMKmG6FksTxsK/bsaaKl3twHp4L46OpJe1y7DEnurlt1qweRBmQmJjggmeQDiN5K9Ii9+N1x+k2BZAxdQmLT9KictgSXFvof9oT4lA1z85vjRCoHRYRWQZFChafHHc4/6sh1Kw4Q3qVYujcbaVNj4IQA8CXAxzCa6uL2N1ilmOZ/3gr+gfor/g23ea5jCirZopgHiNGkpLc6zMMli5804BSx74/ZS2MZF8N9BTRzTfwHRzh7FLtIJZOQ==",
+    "bm_sz": "68E699DF5F994E3702E35CEA80C9C230~YAAQnGnDF5pIiLSYAQAAhG/EvhyMyPiOBIfn55yNRxePMBx7BwYOxiri1N81qVTViTbXqv3afgCxaSR+KnQX/0UGafl2FioEpFHI4cirWbZGNb6RREOQ7VrMMP72FkqOAdj4na5faM35sqVZ7YaDJBQIBdzizvY9QygPX7Ulh0HuHGEwjIyiC7deo1Wi8WdvtS7qQ1P/j4q4weHUGMkkv1zybzu9WYW/7E9ilRkcsu9rPhG3uELA/UcOcvLtr9FmrjSkv6Ro6ZgQ+6O7V0LesZ422z+9QZPXVXX2yDuVvRXjE5RCaQQSNJB9JGefF4E2XeApSAwAqK3IxlAVMcbMjX0Oma4S2BxCrOc5MGI4mFKWVP7UcoPlsTTYoLF88Vx9xC8qafgm5WMk5ovKlxX6qHwl/EsnOw=="
 }
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(proxy=proxy, headless=True)
-    context = browser.new_context(extra_http_headers=headers)
-    context.add_cookies([cookie])
-    page = context.new_page()
-    page.goto("https://api.croma.com/pricing-services/v1/price?productList=312576", timeout=25000)
-    print(page.content())
-    browser.close()
+payload = {
+    "getApplicablePromotionsForItemRequest": {
+        "itemId": "314075",
+        "programId": "01eae2ec-0576-1000-bbea-86e16dcb4b79",
+        "channelIds": ["TCPCHS0003"],
+        "status": "ACTIVE"
+    }
+}
+
+response = requests.post(url, headers=headers, cookies=cookies, json=payload, timeout=20)
+print(response.status_code)
+print(response.json())
