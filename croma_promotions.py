@@ -1,13 +1,11 @@
-# Complete Playwright script with try/except error handling and debug prints
-
 try:
     from playwright.sync_api import sync_playwright
 
     print("Script started")
 
     with sync_playwright() as p:
-        print("Launching browser...")
-        browser = p.chromium.launch(headless=False)  # Browser visible for debugging
+        print("Launching browser in headless mode...")
+        browser = p.chromium.launch(headless=True)  # Headless mode for server
         print("Creating new page...")
         page = browser.new_page()
         product_url = "https://www.croma.com/vivo-y29-5g-6gb-ram-128gb-glacier-blue-/p/312576"
