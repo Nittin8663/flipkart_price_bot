@@ -7,7 +7,7 @@ proxy = {
 }
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(proxy=proxy, headless=False)  # headless=False for human-like
+    browser = p.chromium.launch(proxy=proxy, headless=true)  # headless=False for human-like
     context = browser.new_context(
         user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
         locale="en-US"
