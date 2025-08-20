@@ -1,58 +1,46 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-import time
+import asyncio
+from playwright.async_api import async_playwright
 import json
 
-# Install selenium-wire: pip install selenium-wire
-from seleniumwire import webdriver as wire_webdriver
+async def fetch_offer_with_playwright(product_url, sku_id):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-def get_offer_from_tatadigital(product_url, sku_id):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Remove for visible browser
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--window-size=1920,1080")
+        offers = []
 
-    # Use selenium-wire to intercept requests
-    driver = wire_webdriver.Chrome(options=chrome_options)
+        async def handle_response(response):
+            # Croma benefit-offers API URL check
+            if "benefit-offers" in response.url and f"skuId={sku_id}" in response.url:
+                try:
+                    json_data = await response.json()
+                    best_benefit = json_data.get("data", {}).get("bestBenefitValue", {})
+                    for benefit_type in ["exchangeBenefit", "nonExchangeBenefit"]:
+                        benefit = best_benefit.get(benefit_type, {})
+                        for offer in benefit.get("productTransactionOffers", []):
+                            offers.append({
+                                "section": benefit_type,
+                                "title": offer.get("offerTitle"),
+                                "description": offer.get("offerDescription"),
+                                "savings": offer.get("promotionSavings"),
+                                "type": offer.get("offerType"),
+                                "promotionId": offer.get("promotionId")
+                            })
+                except Exception as e:
+                    print("Error parsing offer response:", e)
 
-    driver.get(product_url)
-    time.sleep(6)  # wait for full page load & offers to appear (adjust if needed)
+        page.on("response", handle_response)
 
-    offers = []
-    # Loop through all network requests
-    for request in driver.requests:
-        if (
-            request.response
-            and "benefit-offers" in request.url
-            and f"skuId={sku_id}" in request.url
-        ):
-            try:
-                data = request.response.body.decode("utf-8")
-                json_data = json.loads(data)
-                # Parse your offer/discount info here
-                best_benefit = json_data.get("data", {}).get("bestBenefitValue", {})
-                for benefit_type in ["exchangeBenefit", "nonExchangeBenefit"]:
-                    benefit = best_benefit.get(benefit_type, {})
-                    for offer in benefit.get("productTransactionOffers", []):
-                        offers.append({
-                            "section": benefit_type,
-                            "title": offer.get("offerTitle"),
-                            "description": offer.get("offerDescription"),
-                            "savings": offer.get("promotionSavings"),
-                            "type": offer.get("offerType"),
-                            "promotionId": offer.get("promotionId")
-                        })
-                break  # Stop after first match for this SKU
-            except Exception as e:
-                print("Error parsing offer response:", e)
-    driver.quit()
-    return offers
+        await page.goto(product_url, wait_until="networkidle")
+        await asyncio.sleep(7)  # JS/API load ke liye wait
 
-# Example usage
-product_url = "https://www.tataneu.com/croma-electronics/product/312576"  # Replace with actual product URL
-sku_id = "312576"
-offers = get_offer_from_tatadigital(product_url, sku_id)
-for offer in offers:
-    print(json.dumps(offer, indent=2))
+        await browser.close()
+        return offers
+
+if __name__ == "__main__":
+    product_url = "https://www.croma.com/vivo-y29-5g-6gb-ram-128gb-glacier-blue-/p/312576"
+    sku_id = "312576"
+    offers = asyncio.run(fetch_offer_with_playwright(product_url, sku_id))
+    for offer in offers:
+        print(json.dumps(offer, indent=2))
