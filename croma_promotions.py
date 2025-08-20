@@ -1,8 +1,8 @@
 import requests
 
 proxies = {
-    "http": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@gw.dataimpulse.com:10000",
-    "https": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@gw.dataimpulse.com:10000",
+    "http": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@74.81.81.81:823",
+    "https": "http://1258bd9e03f80533eb38__cr.in:ca69cf1263c65d0e@74.81.81.81:823",
 }
 
 headers = {
