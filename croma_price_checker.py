@@ -1,33 +1,37 @@
-import requests
+import asyncio
+from playwright.async_api import async_playwright
 
-url = "https://api.croma.com/pricing-services/v1/price?productList=315011"
+async def get_croma_price(url: str):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
 
-headers = {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "en-US,en;q=0.9",
-    "channel": "EC",
-    "origin": "https://www.croma.com",
-    "priority": "u=1, i",
-    "referer": "https://www.croma.com/",
-    "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"Windows"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-}
+        # Product page open karo
+        await page.goto(url, wait_until="domcontentloaded")
 
-response = requests.get(url, headers=headers)
-response.raise_for_status()
-data = response.json()
+        # Croma me price ke liye common selectors
+        selectors = [
+            "span.amount",                  # Example: ₹19,999
+            "span.pdp-price",               # Some product pages
+            "span[data-testid='price']"     # Backup
+        ]
 
-# Extract price info
-if "pricelist" in data and isinstance(data["pricelist"], list) and len(data["pricelist"]) > 0:
-    price_info = data["pricelist"][0]
-    print(f"Item ID: {price_info.get('itemId')}")
-    print(f"MRP: {price_info.get('mrp')}")
-    print(f"Selling Price: {price_info.get('sellingPrice')}")
-    print(f"Discount: {price_info.get('discountPercentage')}")
-else:
-    print("Price data not found in API response.")
+        price = None
+        for sel in selectors:
+            try:
+                element = page.locator(sel).first
+                if await element.count() > 0:
+                    text = await element.text_content()
+                    if text and "₹" in text:
+                        price = text.strip()
+                        break
+            except:
+                continue
+
+        await browser.close()
+        return price or "PRICE NOT FOUND"
+
+if __name__ == "__main__":
+    url = "https://www.croma.com/vivo-y19-5g-4gb-ram-128gb-titanium-silver-/p/315011"
+    price = asyncio.run(get_croma_price(url))
+    print("Croma Price:", price)
